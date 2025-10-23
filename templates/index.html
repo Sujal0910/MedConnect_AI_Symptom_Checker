@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flask Chatbot</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Simple scrollbar styling for webkit browsers */
+        .chat-container::-webkit-scrollbar {
+            width: 6px;
+        }
+        .chat-container::-webkit-scrollbar-thumb {
+            background-color: #4b5563; /* gray-600 */
+            border-radius: 3px;
+        }
+        .chat-container::-webkit-scrollbar-track {
+            background-color: #1f2937; /* gray-800 */
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white font-sans h-full flex flex-col items-center justify-center p-4">
+
+    <div class="bg-gray-800 rounded-2xl shadow-2xl w-full max-w-2xl h-full max-h-[80vh] flex flex-col">
+        
+        <!-- Header -->
+        <div class="flex justify-between items-center p-4 border-b border-gray-700">
+            <h1 class="text-xl font-bold">My AI Chatbot</h1>
+            <!-- Clear Chat Button Form -->
+            <form method="POST" action="{{ url_for('index') }}" class="m-0">
+                <input type="hidden" name="action" value="clear">
+                <button type="submit" 
+                        class="bg-red-600 hover:bg-red-700 text-white text-sm font-medium py-2 px-3 rounded-lg transition-colors duration-200">
+                    Clear Chat
+                </button>
+            </form>
+        </div>
+
+        <!-- Chat History Container -->
+        <div id="chat-container" class="flex-1 p-4 overflow-y-auto space-y-4 chat-container">
+            <!--
+                We will loop over the chat_history from Flask
+                and display each message.
+            -->
+            {% if not chat_history %}
+                <div class="flex justify-center items-center h-full">
+                    <p class="text-gray-400">Ask a question to start the conversation!</p>
+                </div>
+            {% else %}
+                {% for message in chat_history %}
+                    {% if message.role == 'user' %}
+                        <!-- User's Message -->
+                        <div class="flex justify-end">
+                            <div class="bg-blue-600 text-white p-3 rounded-l-lg rounded-br-lg max-w-xs md:max-w-md shadow-md">
+                                <p>{{ message.content }}</p>
+                            </div>
+                        </div>
+                    {% elif message.role == 'assistant' %}
+                        <!-- Bot's Message -->
+                        <div class="flex justify-start">
+                            <div class="bg-gray-700 text-white p-3 rounded-r-lg rounded-bl-lg max-w-xs md:max-w-md shadow-md">
+                                <!-- Use pre-wrap to respect newlines from the AI -->
+                                <p class="whitespace-pre-wrap">{{ message.content }}</p>
+                            </div>
+                        </div>
+                    {% endif %}
+                {% endfor %}
+            {% endif %}
+        </div>
+
+        <!-- Spacer -->
+        <div class="h-2"></div>
+
+        <!-- Input Form -->
+        <div class="p-4 border-t border-gray-700">
+            <form method="POST" action="{{ url_for('index') }}" class="flex items-center space-x-2">
+                <input type="text" 
+                       name="question" 
+                       placeholder="Ask your question..." 
+                       autocomplete="off"
+                       class="flex-1 p-3 bg-gray-700 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-white"
+                       autofocus>
+                <button type-="submit"
+                        name="action"
+                        value="submit"
+                        class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-5 rounded-lg transition-colors duration-200 shadow-lg">
+                    Send
+                </button>
+            </form>
+        </div>
+
+    </div>
+
+    <script>
+        // Scroll to the bottom of the chat container on page load
+        window.onload = function() {
+            const chatContainer = document.getElementById('chat-container');
+            if(chatContainer) {
+                chatContainer.scrollTop = chatContainer.scrollHeight;
+            }
+        }
+    </script>
+
+</body>
+</html>
+
