@@ -1,107 +1,172 @@
-<!DOCTYPE html>
-<html lang="en" class="h-full">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Flask Chatbot</title>
-    <!-- Load Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        /* Simple scrollbar styling for webkit browsers */
-        .chat-container::-webkit-scrollbar {
-            width: 6px;
-        }
-        .chat-container::-webkit-scrollbar-thumb {
-            background-color: #4b5563; /* gray-600 */
-            border-radius: 3px;
-        }
-        .chat-container::-webkit-scrollbar-track {
-            background-color: #1f2937; /* gray-800 */
-        }
-    </style>
-</head>
-<body class="bg-gray-900 text-white font-sans h-full flex flex-col items-center justify-center p-4">
+{% extends "base.html" %}
 
-    <div class="bg-gray-800 rounded-2xl shadow-2xl w-full max-w-2xl h-full max-h-[80vh] flex flex-col">
-        
-        <!-- Header -->
-        <div class="flex justify-between items-center p-4 border-b border-gray-700">
-            <h1 class="text-xl font-bold">My AI Chatbot</h1>
-            <!-- Clear Chat Button Form -->
-            <form method="POST" action="{{ url_for('index') }}" class="m-0">
-                <input type="hidden" name="action" value="clear">
-                <button type="submit" 
-                        class="bg-red-600 hover:bg-red-700 text-white text-sm font-medium py-2 px-3 rounded-lg transition-colors duration-200">
-                    Clear Chat
-                </button>
-            </form>
-        </div>
+{% block title %}Chat - MedConnect AI{% endblock %}
 
-        <!-- Chat History Container -->
-        <div id="chat-container" class="flex-1 p-4 overflow-y-auto space-y-4 chat-container">
-            <!--
-                We will loop over the chat_history from Flask
-                and display each message.
-            -->
-            {% if not chat_history %}
-                <div class="flex justify-center items-center h-full">
-                    <p class="text-gray-400">Ask a question to start the conversation!</p>
-                </div>
-            {% else %}
-                {% for message in chat_history %}
-                    {% if message.role == 'user' %}
-                        <!-- User's Message -->
-                        <div class="flex justify-end">
-                            <div class="bg-blue-600 text-white p-3 rounded-l-lg rounded-br-lg max-w-xs md:max-w-md shadow-md">
-                                <p>{{ message.content }}</p>
-                            </div>
-                        </div>
-                    {% elif message.role == 'assistant' %}
-                        <!-- Bot's Message -->
-                        <div class="flex justify-start">
-                            <div class="bg-gray-700 text-white p-3 rounded-r-lg rounded-bl-lg max-w-xs md:max-w-md shadow-md">
-                                <!-- Use pre-wrap to respect newlines from the AI -->
-                                <p class="whitespace-pre-wrap">{{ message.content }}</p>
-                            </div>
-                        </div>
-                    {% endif %}
-                {% endfor %}
-            {% endif %}
-        </div>
+{% block head %}
+<style>
+    /* Custom scrollbar for chat history */
+    #chat-history::-webkit-scrollbar {
+        width: 6px;
+    }
+    #chat-history::-webkit-scrollbar-track {
+        background: #374151; /* gray-700 */
+        border-radius: 10px;
+    }
+    #chat-history::-webkit-scrollbar-thumb {
+        background: #4B5563; /* gray-600 */
+        border-radius: 10px;
+    }
+    #chat-history::-webkit-scrollbar-thumb:hover {
+        background: #6B7280; /* gray-500 */
+    }
+</style>
+{% endblock %}
 
-        <!-- Spacer -->
-        <div class="h-2"></div>
-
-        <!-- Input Form -->
-        <div class="p-4 border-t border-gray-700">
-            <form method="POST" action="{{ url_for('index') }}" class="flex items-center space-x-2">
-                <input type="text" 
-                       name="question" 
-                       placeholder="Ask your question..." 
-                       autocomplete="off"
-                       class="flex-1 p-3 bg-gray-700 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-white"
-                       autofocus>
-                <button type-="submit"
-                        name="action"
-                        value="submit"
-                        class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-5 rounded-lg transition-colors duration-200 shadow-lg">
-                    Send
-                </button>
-            </form>
-        </div>
-
+{% block content %}
+<!-- Header Bar -->
+<div class="flex items-center justify-between p-4 border-b border-gray-700">
+    <h1 class="text-xl font-bold">MedConnect AI</h1>
+    <div>
+        <!-- current_user is available from Flask-Login -->
+        <span class="text-gray-400 mr-4">Welcome, {{ current_user.name }}!</span>
+        <a href="{{ url_for('logout') }}"
+           class="bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200 text-sm">
+            Logout
+        </a>
     </div>
+</div>
 
-    <script>
-        // Scroll to the bottom of the chat container on page load
-        window.onload = function() {
-            const chatContainer = document.getElementById('chat-container');
-            if(chatContainer) {
-                chatContainer.scrollTop = chatContainer.scrollHeight;
+<!-- Chat History -->
+<div id="chat-history" class="flex-1 p-6 space-y-4 overflow-y-auto">
+    <!-- Chat messages will be loaded here by JavaScript -->
+</div>
+
+<!-- "Thinking" Indicator -->
+<div id="thinking-indicator" class="px-6 py-2 text-gray-400" style="display: none;">
+    <span class="animate-pulse">MedConnect AI is thinking...</span>
+</div>
+
+<!-- Input Form -->
+<form id="chat-form" class="p-4 border-t border-gray-700">
+    <div class="flex items-center space-x-3">
+        <input type="text" id="message-input"
+               placeholder="Type your symptoms here..." autocomplete="off"
+               class="flex-1 p-3 bg-gray-700 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-white"
+               autofocus>
+        <button type="submit"
+                class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-5 rounded-lg transition-colors duration-200 shadow-lg">
+            Send
+        </button>
+    </div>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const chatHistory = document.getElementById('chat-history');
+        const chatForm = document.getElementById('chat-form');
+        const messageInput = document.getElementById('message-input');
+        const thinkingIndicator = document.getElementById('thinking-indicator');
+
+        // Function to scroll to the bottom of the chat
+        function scrollToBottom() {
+            chatHistory.scrollTop = chatHistory.scrollHeight;
+        }
+
+        // Function to add a message to the chat window
+        function addMessage(sender, message) {
+            const messageElement = document.createElement('div');
+            messageElement.classList.add('flex', 'max-w-xs', 'md:max-w-md', 'lg:max-w-lg', 'rounded-lg', 'p-3', 'text-white', 'shadow-md');
+            
+            if (sender === 'user') {
+                messageElement.classList.add('bg-blue-600', 'ml-auto');
+            } else {
+                messageElement.classList.add('bg-gray-600', 'mr-auto');
+            }
+            
+            // Sanitize and set text content
+            const p = document.createElement('p');
+            p.textContent = message;
+            messageElement.appendChild(p);
+
+            chatHistory.appendChild(messageElement);
+            scrollToBottom();
+        }
+
+        // --- Load existing chat history from the server ---
+        async function loadHistory() {
+            try {
+                const response = await fetch("{{ url_for('get_history') }}");
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                const history = await response.json();
+                
+                chatHistory.innerHTML = ''; // Clear any existing
+                
+                if (history.length === 0) {
+                    // Show welcome message if chat is empty
+                    const welcomeMessage = document.createElement('div');
+                    welcomeMessage.classList.add('text-center', 'text-gray-400', 'py-10');
+                    welcomeMessage.textContent = "Describe your symptoms to get started. I am an AI, not a doctor. All chats are saved to your private health record.";
+                    chatHistory.appendChild(welcomeMessage);
+                } else {
+                    history.forEach(item => {
+                        addMessage(item.role, item.content);
+                    });
+                }
+                scrollToBottom();
+            } catch (error) {
+                console.error('Error loading chat history:', error);
+                addMessage('assistant', 'Sorry, I couldn\'t load your chat history.');
             }
         }
-    </script>
 
-</body>
-</html>
+        // --- Handle form submission ---
+        chatForm.addEventListener('submit', async function(e) {
+            e.preventDefault(); // Stop page reload
+            
+            const userMessage = messageInput.value.trim();
+            if (userMessage === '') {
+                return;
+            }
+
+            // Add user message to UI
+            addMessage('user', userMessage);
+            messageInput.value = '';
+            thinkingIndicator.style.display = 'block'; // Show "thinking..."
+
+            // Send message to server and get response
+            try {
+                const response = await fetch("{{ url_for('ask') }}", {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ message: userMessage }),
+                });
+
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+
+                const data = await response.json();
+                
+                // Add assistant's response to UI
+                addMessage('assistant', data.answer);
+                
+            } catch (error) {
+                console.error('Error sending message:', error);
+                addMessage('assistant', 'Sorry, something went wrong. Please try again.');
+            } finally {
+                thinkingIndicator.style.display = 'none'; // Hide "thinking..."
+            }
+        });
+
+        // Initial load of chat history
+        loadHistory();
+    });
+</script>
+{% endblock %}
 
