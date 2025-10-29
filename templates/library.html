@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+
+{% block title %}Article Library - MedConnect AI{% endblock %}
+
+{% block content %}
+<div class="bg-gray-800 p-6 rounded-lg shadow-xl">
+    <h1 class="text-3xl font-bold text-white mb-6">Verified Health Library</h1>
+    <p class="text-lg text-gray-300 mb-8">
+        Safe, simple, and verified health information to help you make informed decisions.
+        This content is for informational purposes only and is not a substitute for professional medical advice.
+    </p>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {% for article in articles %}
+            <a href="{{ url_for('article_detail', article_id=article.id) }}" class="block p-6 bg-gray-700 rounded-lg shadow-md hover:bg-gray-600 transition duration-300 ease-in-out transform hover:-translate-y-1">
+                <span class="inline-block bg-blue-500 text-white text-xs font-semibold px-2.5 py-0.5 rounded-full mb-2">{{ article.category }}</span>
+                <h2 class="text-xl font-semibold text-white mb-2">{{ article.title }}</h2>
+                <p class="text-gray-300 text-sm">Click to read more...</p>
+            </a>
+        {% else %}
+            <p class="text-gray-400">No articles found in the library.</p>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}
+

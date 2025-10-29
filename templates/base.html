@@ -1,42 +1,111 @@
 <!DOCTYPE html>
-<html lang="en" class="h-full">
+<html lang="en" class="h-full bg-gray-900">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <!-- Use title block for individual page titles -->
     <title>{% block title %}MedConnect AI{% endblock %}</title>
+    <!-- Load Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Extra head content can be added here -->
-    {% block head %}{% endblock %}
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        gray: {
+                            700: '#374151',
+                            800: '#1F2937',
+                            900: '#111827',
+                        }
+                    },
+                    // This adds the 'prose' class for styling markdown
+                    typography: (theme) => ({
+                        DEFAULT: {
+                            css: {
+                                color: theme('colors.gray.300'),
+                                a: {
+                                    color: theme('colors.blue.400'),
+                                    '&:hover': {
+                                        color: theme('colors.blue.600'),
+                                    },
+                                },
+                                h1: { color: theme('colors.white') },
+                                h2: { color: theme('colors.white') },
+                                h3: { color: theme('colors.white') },
+                                h4: { color: theme('colors.white') },
+                                strong: { color: theme('colors.white') },
+                                blockquote: {
+                                    color: theme('colors.gray.400'),
+                                    borderLeftColor: theme('colors.gray.700'),
+                                },
+                                ul: {
+                                    li: {
+                                        '&::marker': {
+                                            color: theme('colors.blue.400'),
+                                        },
+                                    },
+                                },
+                                ol: {
+                                    li: {
+                                        '&::marker': {
+                                            color: theme('colors.blue.400'),
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                    }),
+                }
+            },
+            // THIS IS THE FIX: 
+            // The 'plugins' array with 'require()' was causing the error.
+            // It's not needed here because we are loading the plugin
+            // via the script tag below.
+            plugins: [],
+        }
+    </script>
+    <!-- This plugin is required for the 'prose' class -->
+    <script src="https://cdn.tailwindcss.com/3.4.1?plugins=typography"></script>
 </head>
-<body class="bg-gray-900 text-white font-sans h-full flex flex-col items-center justify-center p-4">
+<body class="h-full flex flex-col text-gray-200">
 
-    <!-- Flash Messages -->
-    {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-            <div class="absolute top-5 z-50 w-full max-w-2xl px-4">
-                {% for category, message in messages %}
-                    <div class="p-4 rounded-lg mb-2
-                        {% if category == 'success' %} bg-green-600
-                        {% elif category == 'danger' %} bg-red-600
-                        {% elif category == 'info' %} bg-blue-600
-                        {% else %} bg-gray-600
-                        {% endif %}
-                        text-white shadow-lg">
-                        {{ message }}
-                    </div>
-                {% endfor %}
+    <!-- Navbar -->
+    <nav class="bg-gray-800 shadow-md w-full">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <!-- Logo -->
+                <div class="flex-shrink-0">
+                    <span class="text-white text-xl font-bold">MedConnect AI</span>
+                </div>
+                
+                <!-- Navigation Links -->
+                <div class="hidden md:flex items-center space-x-4">
+                    <a href="{{ url_for('index') }}" class="text-gray-300 hover:bg-gray-700 hover:text-white px-3 py-2 rounded-md text-sm font-medium">Chat</a>
+                    <a href="{{ url_for('library') }}" class="text-gray-300 hover:bg-gray-700 hover:text-white px-3 py-2 rounded-md text-sm font-medium">Library</a>
+                    <button id="clear-chat-btn" class="text-gray-300 hover:bg-gray-700 hover:text-white px-3 py-2 rounded-md text-sm font-medium">Clear Chat</button>
+                </div>
+
+                <!-- User Info & Logout -->
+                <div class="hidden md:flex items-center space-x-4">
+                    <span class="text-gray-400 text-sm">Welcome, {{ current_user.name }}</span>
+                    <a href="{{ url_for('logout') }}" class="bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded-md text-sm font-medium">Logout</a>
+                </div>
+                
+                <!-- Mobile Menu Button (Optional, for future) -->
+                <div class="md:hidden flex items-center">
+                    <a href="{{ url_for('logout') }}" class="bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded-md text-sm font-medium">Logout</a>
+                </div>
             </div>
-        {% endif %}
-    {% endwith %}
+        </div>
+    </nav>
 
-    <!-- Main content block -->
-    <div class="bg-gray-800 rounded-2xl shadow-2xl w-full max-w-2xl h-full max-h-[90vh] flex flex-col">
+    <!-- Main Content -->
+    <main class="flex-1 overflow-y-auto">
         {% block content %}{% endblock %}
-    </div>
+    </main>
 
-    <!-- Scripts block -->
-    {% block scripts %}{% endblock %}
+    
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
 </body>
 </html>
 

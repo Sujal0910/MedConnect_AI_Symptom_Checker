@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+
+{% block title %}{{ article.title }} - MedConnect AI{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8 md:py-12 lg:py-16">
+    <div class="max-w-4xl mx-auto bg-gray-800 rounded-xl shadow-xl p-6 md:p-10 border border-gray-700">
+        
+        <!-- Back Button -->
+        <a href="{{ url_for('library') }}" class="text-blue-400 hover:text-blue-300 transition duration-150 flex items-center mb-6">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+            </svg>
+            ← Back to Library
+        </a>
+
+        <!-- Category Tag -->
+        <span class="inline-block bg-blue-600 text-white text-xs font-semibold px-3 py-1 rounded-full uppercase tracking-wider mb-3">
+            {{ article.category }}
+        </span>
+
+        <!-- Title -->
+        <h1 class="text-4xl font-extrabold text-white mb-6 border-b border-gray-700 pb-3">
+            {{ article.title }}
+        </h1>
+
+        <!-- Article Content - THIS IS THE FIX -->
+        <div class="prose prose-invert max-w-none text-gray-300">
+            <!-- Renders the Markdown content as safe HTML -->
+            {{ article.content_html | safe }}
+        </div>
+        
+    </div>
+</div>
+{% endblock %}

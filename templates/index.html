@@ -2,171 +2,285 @@
 
 {% block title %}Chat - MedConnect AI{% endblock %}
 
-{% block head %}
-<style>
-    /* Custom scrollbar for chat history */
-    #chat-history::-webkit-scrollbar {
-        width: 6px;
-    }
-    #chat-history::-webkit-scrollbar-track {
-        background: #374151; /* gray-700 */
-        border-radius: 10px;
-    }
-    #chat-history::-webkit-scrollbar-thumb {
-        background: #4B5563; /* gray-600 */
-        border-radius: 10px;
-    }
-    #chat-history::-webkit-scrollbar-thumb:hover {
-        background: #6B7280; /* gray-500 */
-    }
-</style>
-{% endblock %}
-
 {% block content %}
-<!-- Header Bar -->
-<div class="flex items-center justify-between p-4 border-b border-gray-700">
-    <h1 class="text-xl font-bold">MedConnect AI</h1>
-    <div>
-        <!-- current_user is available from Flask-Login -->
-        <span class="text-gray-400 mr-4">Welcome, {{ current_user.name }}!</span>
-        <a href="{{ url_for('logout') }}"
-           class="bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200 text-sm">
-            Logout
-        </a>
+<div class="flex-1 flex flex-col h-full p-4 md:p-8 lg:p-12" style="height: calc(100vh - 64px);">
+    
+    <!-- Chat Window -->
+    <div id="chat-window" class="flex-1 bg-gray-800 rounded-lg shadow-inner overflow-y-auto p-6 space-y-4 mb-4">
+        <!-- Messages will be dynamically added here -->
     </div>
-</div>
 
-<!-- Chat History -->
-<div id="chat-history" class="flex-1 p-6 space-y-4 overflow-y-auto">
-    <!-- Chat messages will be loaded here by JavaScript -->
-</div>
+    <!-- Loading Indicator -->
+    <div id="loading-indicator" class="hidden flex items-center justify-center mb-2">
+        <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-blue-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+        <span class="text-gray-400">MedConnect AI is thinking...</span>
+    </div>
 
-<!-- "Thinking" Indicator -->
-<div id="thinking-indicator" class="px-6 py-2 text-gray-400" style="display: none;">
-    <span class="animate-pulse">MedConnect AI is thinking...</span>
-</div>
-
-<!-- Input Form -->
-<form id="chat-form" class="p-4 border-t border-gray-700">
-    <div class="flex items-center space-x-3">
-        <input type="text" id="message-input"
-               placeholder="Type your symptoms here..." autocomplete="off"
-               class="flex-1 p-3 bg-gray-700 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-white"
-               autofocus>
-        <button type="submit"
-                class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-5 rounded-lg transition-colors duration-200 shadow-lg">
+    <!-- 
+      Input Form 
+      We pass the Flask URLs to the script via data- attributes
+      This is the most robust way to do it.
+    -->
+    <form id="chat-form" 
+          class="flex items-center space-x-3"
+          data-ask-url="{{ url_for('ask') }}"
+          data-history-url="{{ url_for('get_history') }}"
+          data-clear-url="{{ url_for('clear_chat') }}"
+          data-user-name="{{ current_user.name }}">
+        <input type="text" id="message-input" placeholder="Type your symptoms here..." autocomplete="off" class="flex-1 p-3 bg-gray-700 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-white" autofocus>
+        <button type="submit" id="send-button" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg shadow-md transition duration-200 ease-in-out">
             Send
         </button>
+    </form>
+</div>
+
+<!-- Custom Modal for Errors -->
+<div id="error-modal" class="hidden fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 p-4">
+    <div class="bg-gray-800 rounded-lg shadow-2xl max-w-sm w-full p-6 border border-red-500">
+        <h3 class="text-xl font-semibold text-red-400 mb-4">An Error Occurred</h3>
+        <p id="error-message" class="text-gray-300 mb-6">Something went wrong. Please try again.</p>
+        <button id="close-modal-btn" class="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-lg transition duration-200 ease-in-out">
+            Close
+        </button>
     </div>
-</form>
-{% endblock %}
+</div>
 
-{% block scripts %}
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        const chatHistory = document.getElementById('chat-history');
-        const chatForm = document.getElementById('chat-form');
-        const messageInput = document.getElementById('message-input');
-        const thinkingIndicator = document.getElementById('thinking-indicator');
+    // --- Get DOM Elements ---
+    const chatWindow = document.getElementById('chat-window');
+    const chatForm = document.getElementById('chat-form');
+    const messageInput = document.getElementById('message-input');
+    const sendButton = document.getElementById('send-button');
+    const loadingIndicator = document.getElementById('loading-indicator');
+    const errorModal = document.getElementById('error-modal');
+    const errorMessage = document.getElementById('error-message');
+    const closeModalBtn = document.getElementById('close-modal-btn');
 
-        // Function to scroll to the bottom of the chat
-        function scrollToBottom() {
-            chatHistory.scrollTop = chatHistory.scrollHeight;
+    // --- State & URLs ---
+    // Read URLs safely from the data attributes
+    const ASK_URL = chatForm.dataset.askUrl;
+    const HISTORY_URL = chatForm.dataset.historyUrl;
+    const CLEAR_URL = chatForm.dataset.clearUrl;
+    const currentUserName = chatForm.dataset.userName;
+
+
+    // --- Helper Functions ---
+
+    /**
+     * Adds a message to the chat window.
+     * @param {string} sender - 'user' or 'assistant'
+     * @param {string} text - The message text
+     */
+    function addMessageToChat(sender, text) {
+        // Create the outer div that aligns the message
+        const messageDiv = document.createElement('div');
+        messageDiv.classList.add('flex', 'w-full');
+
+        // Create the message bubble
+        const bubble = document.createElement('div');
+        bubble.classList.add('rounded-lg', 'px-4', 'py-3', 'shadow-md', 'max-w-xl');
+
+        if (sender === 'user') {
+            // User: align right
+            messageDiv.classList.add('justify-end');
+            bubble.classList.add('bg-blue-600', 'text-white');
+            bubble.textContent = text;
+        } else {
+            // Assistant: align left
+            messageDiv.classList.add('justify-start');
+            bubble.classList.add('bg-gray-700', 'text-white', 'prose', 'prose-invert', 'max-w-2xl', 'overflow-x-auto');
+            // This is the fix: use Marked.js to parse Markdown to HTML
+            // and apply prose for styling and overflow-x-auto for tables.
+            bubble.innerHTML = marked.parse(text);
         }
 
-        // Function to add a message to the chat window
-        function addMessage(sender, message) {
-            const messageElement = document.createElement('div');
-            messageElement.classList.add('flex', 'max-w-xs', 'md:max-w-md', 'lg:max-w-lg', 'rounded-lg', 'p-3', 'text-white', 'shadow-md');
+        messageDiv.appendChild(bubble);
+        chatWindow.appendChild(messageDiv);
+        scrollToBottom();
+    }
+
+    /**
+     * Scrolls the chat window to the bottom.
+     */
+    function scrollToBottom() {
+        chatWindow.scrollTop = chatWindow.scrollHeight;
+    }
+
+    /**
+     * Toggles the UI state between loading and idle.
+     * @param {boolean} isLoading - True if loading, false if idle
+     */
+    function setLoading(isLoading) {
+        if (isLoading) {
+            loadingIndicator.classList.remove('hidden');
+            sendButton.disabled = true;
+            messageInput.disabled = true;
+        } else {
+            loadingIndicator.classList.add('hidden');
+            sendButton.disabled = false;
+            messageInput.disabled = false;
+            messageInput.focus();
+        }
+    }
+
+    /**
+     * Shows a custom, non-blocking error modal.
+     * @param {string} message - The error message to display
+     */
+    function showCustomError(message) {
+        errorMessage.textContent = message;
+        errorModal.classList.remove('hidden');
+    }
+
+    // --- Event Handlers ---
+
+    /**
+     * Handles the chat form submission.
+     */
+    async function handleChatSubmit(e) {
+        e.preventDefault(); // Stop the form from reloading the page
+        const message = messageInput.value.trim();
+        if (!message) return;
+
+        addMessageToChat('user', message);
+        messageInput.value = '';
+        setLoading(true);
+
+        try {
+            const response = await fetch(ASK_URL, {
+                method: 'POST',
+                // This 'credentials' line is CRITICAL for Flask-Login
+                credentials: 'same-origin', 
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ message: message }),
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(errorText);
+            }
+
+            // Check if the server sent JSON or (incorrectly) HTML
+            const contentType = response.headers.get("content-type");
+            if (!contentType || !contentType.includes("application/json")) {
+                // This means the session is invalid, and we got the login page.
+                throw new Error("Your session has expired. Please log out and log back in.");
+            }
+
+            const data = await response.json();
+            addMessageToChat('assistant', data.answer);
+
+        } catch (error) {
+            console.error('Error during fetch:', error);
+            showCustomError(error.message);
+        } finally {
+            setLoading(false);
+        }
+    }
+
+    /**
+     * Fetches and loads the chat history.
+     */
+    async function loadHistory() {
+        setLoading(true);
+        try {
+            const response = await fetch(HISTORY_URL, {
+                method: 'GET',
+                credentials: 'same-origin' 
+            });
             
-            if (sender === 'user') {
-                messageElement.classList.add('bg-blue-600', 'ml-auto');
-            } else {
-                messageElement.classList.add('bg-gray-600', 'mr-auto');
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(errorText);
             }
             
-            // Sanitize and set text content
-            const p = document.createElement('p');
-            p.textContent = message;
-            messageElement.appendChild(p);
+            // Check if the server sent JSON or (incorrectly) HTML
+            const contentType = response.headers.get("content-type");
+            if (!contentType || !contentType.includes("application/json")) {
+                throw new Error("Your session has expired. Please log out and log back in.");
+            }
 
-            chatHistory.appendChild(messageElement);
+            const history = await response.json();
+            
+            if (history.length > 0) {
+                history.forEach(msg => addMessageToChat(msg.role, msg.content));
+            } else {
+                // Show welcome message if history is empty
+                addMessageToChat('assistant', `Welcome, ${currentUserName}! I'm MedConnect AI. How can I help you today? \n\nI am an AI, not a doctor. Please consult a medical professional for any serious health concerns.`);
+            }
+
+        } catch (error) {
+            console.error('Error loading history:', error);
+            showCustomError(error.message || 'Could not load chat history. Please refresh the page.');
+        } finally {
+            setLoading(false);
             scrollToBottom();
         }
+    }
 
-        // --- Load existing chat history from the server ---
-        async function loadHistory() {
-            try {
-                const response = await fetch("{{ url_for('get_history') }}");
-                if (!response.ok) {
-                    throw new Error('Network response was not ok');
-                }
-                const history = await response.json();
-                
-                chatHistory.innerHTML = ''; // Clear any existing
-                
-                if (history.length === 0) {
-                    // Show welcome message if chat is empty
-                    const welcomeMessage = document.createElement('div');
-                    welcomeMessage.classList.add('text-center', 'text-gray-400', 'py-10');
-                    welcomeMessage.textContent = "Describe your symptoms to get started. I am an AI, not a doctor. All chats are saved to your private health record.";
-                    chatHistory.appendChild(welcomeMessage);
-                } else {
-                    history.forEach(item => {
-                        addMessage(item.role, item.content);
-                    });
-                }
-                scrollToBottom();
-            } catch (error) {
-                console.error('Error loading chat history:', error);
-                addMessage('assistant', 'Sorry, I couldn\'t load your chat history.');
-            }
+    /**
+     * Handles the "Clear Chat" button click.
+     */
+    async function handleClearChat(e) {
+        e.preventDefault();
+        
+        // This is a stub for a custom, non-blocking confirm modal
+        // In a real app, you'd build a beautiful modal here.
+        if (!window.confirm("Are you sure you want to clear your chat history? This cannot be undone.")) {
+            return;
         }
+        
+        console.log("Attempting to clear chat...");
+        
+        try {
+            const response = await fetch(CLEAR_URL, {
+                method: 'POST',
+                credentials: 'same-origin' 
+            });
 
-        // --- Handle form submission ---
-        chatForm.addEventListener('submit', async function(e) {
-            e.preventDefault(); // Stop page reload
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(errorText);
+            }
             
-            const userMessage = messageInput.value.trim();
-            if (userMessage === '') {
-                return;
+            // Check if the server sent JSON or (incorrectly) HTML
+            const contentType = response.headers.get("content-type");
+            if (!contentType || !contentType.includes("application/json")) {
+                throw new Error("Your session has expired. Please log out and log back in.");
             }
 
-            // Add user message to UI
-            addMessage('user', userMessage);
-            messageInput.value = '';
-            thinkingIndicator.style.display = 'block'; // Show "thinking..."
+            // Clear chat window
+            chatWindow.innerHTML = '';
+            // Show welcome message again
+            addMessageToChat('assistant', `Welcome, ${currentUserName}! I'm MedConnect AI. How can I help you today? \n\nI am an AI, not a doctor. Please consult a medical professional for any serious health concerns.`);
 
-            // Send message to server and get response
-            try {
-                const response = await fetch("{{ url_for('ask') }}", {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ message: userMessage }),
-                });
+        } catch (error) {
+            console.error('Error clearing chat:', error);
+            showCustomError(error.message);
+        }
+    }
 
-                if (!response.ok) {
-                    throw new Error('Network response was not ok');
-                }
+    // --- Attach Event Listeners ---
+    chatForm.addEventListener('submit', handleChatSubmit);
+    
+    // Attach listener to the "Clear Chat" button in the navbar
+    const clearChatBtn = document.getElementById('clear-chat-btn');
+    if (clearChatBtn) {
+        clearChatBtn.addEventListener('click', handleClearChat);
+    }
 
-                const data = await response.json();
-                
-                // Add assistant's response to UI
-                addMessage('assistant', data.answer);
-                
-            } catch (error) {
-                console.error('Error sending message:', error);
-                addMessage('assistant', 'Sorry, something went wrong. Please try again.');
-            } finally {
-                thinkingIndicator.style.display = 'none'; // Hide "thinking..."
-            }
-        });
-
-        // Initial load of chat history
-        loadHistory();
+    closeModalBtn.addEventListener('click', () => {
+        errorModal.classList.add('hidden');
     });
+
+    // --- Initial Load ---
+    loadHistory();
+
 </script>
 {% endblock %}
 
