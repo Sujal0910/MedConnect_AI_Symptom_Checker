@@ -1,5 +1,6 @@
 import os
 import markdown
+import json # Import json for parsing AI responses
 from dotenv import load_dotenv
 from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
 from flask_sqlalchemy import SQLAlchemy
@@ -7,7 +8,7 @@ from flask_login import LoginManager, UserMixin, login_user, logout_user, login_
 from flask_bcrypt import Bcrypt
 from openai import OpenAI
 from sqlalchemy.exc import IntegrityError
-from datetime import datetime
+from datetime import datetime, time
 
 # --- App Initialization ---
 load_dotenv()
@@ -42,6 +43,7 @@ class User(db.Model, UserMixin):
     email = db.Column(db.String(150), unique=True, nullable=False)
     password_hash = db.Column(db.String(128), nullable=False)
     chat_history = db.relationship('ChatHistory', backref='author', lazy=True, cascade="all, delete-orphan")
+    reminders = db.relationship('Reminder', backref='author', lazy=True, cascade="all, delete-orphan")
 
     def __repr__(self):
         return f"User('{self.name}', '{self.email}')"
@@ -60,16 +62,33 @@ class Article(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(200), nullable=False)
     category = db.Column(db.String(50), nullable=False)
-    # Store content as Markdown text
     content_md = db.Column(db.Text, nullable=False)
     
     @property
     def content_html(self):
-        # Convert Markdown to HTML on the fly
         return markdown.markdown(self.content_md)
 
     def __repr__(self):
         return f"Article('{self.title}', '{self.category}')"
+
+class Reminder(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    medicine_name = db.Column(db.String(100), nullable=False)
+    dosage = db.Column(db.String(50), nullable=True)
+    reminder_time = db.Column(db.Time, nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    
+    def __repr__(self):
+        return f"Reminder('{self.medicine_name}', '{self.reminder_time}')"
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'medicine_name': self.medicine_name,
+            'dosage': self.dosage,
+            # Convert time to string in HH:MM AM/PM format
+            'reminder_time': self.reminder_time.strftime('%I:%M %p')
+        }
 
 
 # --- Database Initialization Command ---
@@ -295,7 +314,6 @@ def signup():
         new_user = User(name=name, email=email, password_hash=hashed_password)
         
         try:
-            # --- THIS IS THE FIX for the typo ---
             db.session.add(new_user)
             db.session.commit()
             flash('Your account has been created! You can now log in.', 'success')
@@ -353,8 +371,6 @@ def article_detail(article_id):
         flash('Article not found.', 'danger')
         return redirect(url_for('library'))
     
-    # Convert Markdown to HTML for rendering
-    # The conversion now happens in the template or via the property
     return render_template('article_detail.html', title=article.title, article=article)
 
 # --- Chat API Routes ---
@@ -363,8 +379,7 @@ def get_openrouter_response(messages):
     """Gets a response from the OpenRouter API."""
     try:
         completion = client.chat.completions.create(
-            # This is the fix: switching to a model that respects instructions
-            model="openai/gpt-oss-20b:free",
+            model="openai/gpt-oss-20b:free", 
             messages=messages,
             max_tokens=1024,
         )
@@ -391,19 +406,26 @@ def ask():
     user_message = ChatHistory(role='user', content=user_message_content, author=current_user)
     db.session.add(user_message)
     
-    # Create the context for the AI
+    # --- NEW: System Prompt with Function Calling ---
     system_prompt = {
         "role": "system",
         "content": (
-            "**YOUR MOST IMPORTANT RULE: You MUST refuse to answer any questions that are not related to health, medicine, wellness, or symptoms.** "
-            "If the user asks about anything else (like sports, history, 'explain world war 2', movies, or general knowledge), you must politely decline with a message like: "
-            "'I'm sorry, I'm a medical assistant and can only answer questions about your health and wellness. How are you feeling today?' "
-            "\n\n---"
-            "Your persona: You are 'MedConnect AI', a helpful AI symptom checker. "
-            "Your secondary purpose is to listen to a user's health concerns, provide preliminary information, and gently guide them. "
-            "You are NOT a doctor and must NEVER provide a diagnosis or prescribe medicine. "
-            "Always end your (health-related) response with a clear, friendly disclaimer, like 'Please remember, I am an AI, not a medical professional. It's always best to consult a doctor for a proper diagnosis.' "
-            "Keep your answers concise and easy to understand."
+            "You have two tasks. First, be a helpful medical AI. Second, be a reminder assistant."
+            "\n\n**TASK 1: Medical AI**"
+            "\n- **YOUR MOST IMPORTANT RULE:** You MUST refuse to answer any questions that are not related to health, medicine, wellness, or symptoms. "
+            "If the user asks about anything else (like sports, history, movies, or general knowledge), you must politely decline with a message like: "
+            "'I'm sorry, I'm a medical assistant and can only answer questions about your health and wellness. How are you feeling today?'"
+            "\n- Your persona: You are 'MedConnect AI'. You are NOT a doctor and must NEVER provide a diagnosis. "
+            "Always end your (health-related) response with a clear, friendly disclaimer: 'Please remember, I am an AI, not a medical professional. It's always best to consult a doctor for a proper diagnosis.You must consult a qualified healthcare professional ,such as a doctor or pharmacist ,before taking any medications'"
+            "\n\n**TASK 2: Reminder Assistant**"
+            "\n- If the user asks to set a medicine reminder, your goal is to collect three pieces of information: `medicine_name`, `dosage` (optional), and `time` (in 24-hour HH:MM format)."
+            "\n- Ask for any missing information. If the user just says 'remind me to take my pill at 8', you must ask 'What is the medicine's name?' and 'Is that 8 AM or 8 PM? Please provide the time in 24-hour HH:MM format, like 08:00 or 20:00.'"
+            "\n- Once you have the required info, you **MUST** respond *only* with a special JSON-like string and nothing else."
+            "\n- **JSON Format:** `{\"action\": \"create_reminder\", \"medicine\": \"...\", \"dosage\": \"...\", \"time\": \"HH:MM\"}`"
+            "\n- If `dosage` is not specified, set its value to `None` (as a string: \"None\")."
+            "\n- **Example 1:** `{\"action\": \"create_reminder\", \"medicine\": \"Paracetamol\", \"dosage\": \"500mg\", \"time\": \"08:00\"}`"
+            "\n- **Example 2:** `{\"action\": \"create_reminder\", \"medicine\": \"Aspirin\", \"dosage\": \"None\", \"time\": \"14:30\"}`"
+            "\n- Only respond with this JSON string. The system will handle the confirmation."
         )
     }
     
@@ -416,11 +438,60 @@ def ask():
     # Get AI response
     ai_response_content = get_openrouter_response(messages)
     
-    # Save AI response
+    # --- NEW: Check for Function Call ---
+    try:
+        # Check if the response is our special JSON string
+        data = json.loads(ai_response_content)
+        
+        if data.get('action') == 'create_reminder':
+            # It's a reminder! Let's process it.
+            med_name = data.get('medicine')
+            dosage = data.get('dosage')
+            time_str = data.get('time')
+
+            if dosage == "None":
+                dosage = None # Convert string "None" to Python's None
+            
+            if not med_name or not time_str:
+                # The AI failed to extract data, send a normal error
+                ai_response_content = "I'm sorry, I missed some of those details. Could you please provide the medicine name and time again?"
+            else:
+                try:
+                    # Convert "HH:MM" string to a Python time object
+                    reminder_time_obj = time.fromisoformat(time_str)
+                    
+                    new_reminder = Reminder(
+                        medicine_name=med_name,
+                        dosage=dosage,
+                        reminder_time=reminder_time_obj,
+                        author=current_user
+                    )
+                    db.session.add(new_reminder)
+                    
+                    # Craft our *own* friendly confirmation message
+                    time_friendly = reminder_time_obj.strftime('%I:%M %p') # e.g., "08:00 AM"
+                    dosage_text = f" ({dosage})" if dosage else ""
+                    ai_response_content = f"OK, I've set a reminder for {med_name}{dosage_text} at {time_friendly}. You can see all your reminders on the 'Reminders' page."
+
+                except ValueError:
+                    ai_response_content = f"I'm sorry, I couldn't understand the time '{time_str}'. Please provide it in 24-hour HH:MM format (e.g., 08:00 for 8 AM or 20:00 for 8 PM)."
+                except Exception as e:
+                    db.session.rollback()
+                    app.logger.error(f"Error creating reminder from AI: {e}")
+                    ai_response_content = "I'm sorry, I had trouble saving that reminder. Please try again or use the manual form on the 'Reminders' page."
+
+    except (json.JSONDecodeError, TypeError):
+        # It's a normal chat message, not a JSON object.
+        # We don't need to do anything, just let it proceed.
+        pass
+    
+    # --- End of New Logic ---
+
+    # Save AI response (either the original one or our new confirmation message)
     ai_message = ChatHistory(role='assistant', content=ai_response_content, author=current_user)
     db.session.add(ai_message)
     
-    # Commit both messages at once
+    # Commit user message + AI message
     try:
         db.session.commit()
     except Exception as e:
@@ -442,9 +513,76 @@ def clear_chat():
         app.logger.error(f"Error clearing chat history: {e}")
         return jsonify({"error": "Could not clear chat history"}), 500
 
+
+# --- Medicine Reminder Routes (API-driven) ---
+
+@app.route('/reminders')
+@login_required
+def reminders():
+    # The page itself is simple, all data is loaded via API
+    return render_template('reminders.html', title='Medicine Reminders')
+
+@app.route('/api/get_reminders', methods=['GET'])
+@login_required
+def get_reminders():
+    reminders = Reminder.query.filter_by(user_id=current_user.id).order_by(Reminder.reminder_time).all()
+    # Convert list of Reminder objects to list of dictionaries
+    return jsonify([r.to_dict() for r in reminders])
+
+@app.route('/api/add_reminder', methods=['POST'])
+@login_required
+def add_reminder():
+    data = request.json
+    try:
+        med_name = data.get('medicine_name')
+        dosage = data.get('dosage')
+        time_str = data.get('reminder_time') # Expected format: "HH:MM" (24-hour)
+
+        if not med_name or not time_str:
+            return jsonify({"error": "Medicine name and time are required."}), 400
+        
+        # Convert "HH:MM" string to a Python time object
+        reminder_time_obj = time.fromisoformat(time_str)
+        
+        new_reminder = Reminder(
+            medicine_name=med_name,
+            dosage=dosage,
+            reminder_time=reminder_time_obj,
+            author=current_user
+        )
+        db.session.add(new_reminder)
+        db.session.commit()
+        
+        # Return the newly created reminder so the frontend can add it to the list
+        return jsonify(new_reminder.to_dict()), 201
+        
+    except ValueError:
+        return jsonify({"error": "Invalid time format. Please use HH:MM (24-hour)."}), 400
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error(f"Error adding reminder: {e}")
+        return jsonify({"error": "An internal error occurred."}), 500
+
+@app.route('/api/delete_reminder/<int:reminder_id>', methods=['DELETE'])
+@login_required
+def delete_reminder(reminder_id):
+    try:
+        reminder = Reminder.query.get_or_404(reminder_id)
+        
+        # Security check: make sure the reminder belongs to the logged-in user
+        if reminder.user_id != current_user.id:
+            return jsonify({"error": "Unauthorized"}), 403
+            
+        db.session.delete(reminder)
+        db.session.commit()
+        return jsonify({"status": "success", "message": "Reminder deleted."})
+        
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error(f"Error deleting reminder: {e}")
+        return jsonify({"error": "An internal error occurred."}), 500
+
+
 # --- Main Run ---
 if __name__ == '__main__':
     app.run(debug=True)
-
-
-

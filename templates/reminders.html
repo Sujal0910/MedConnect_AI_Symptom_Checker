@@ -1,0 +1,236 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="container mx-auto max-w-4xl p-4 md:p-8 lg:p-12">
+    <h1 class="text-3xl font-bold text-white mb-8">Medicine Reminders</h1>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+        
+        <!-- Add New Reminder Form -->
+        <div class="bg-gray-800 p-6 rounded-lg shadow-lg">
+            <h2 class="text-2xl font-semibold text-white mb-6">Add New Reminder</h2>
+            
+            <!-- Error Message Div -->
+            <div id="error-message" class="hidden bg-red-800 text-white p-3 rounded-lg mb-4"></div>
+
+            <form id="reminder-form" class="space-y-4">
+                <div>
+                    <label for="medicine-name" class="block text-sm font-medium text-gray-300">Medicine Name</label>
+                    <input type="text" id="medicine-name" name="medicine_name" class="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-lg p-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="e.g., Paracetamol" required>
+                </div>
+                
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label for="dosage" class="block text-sm font-medium text-gray-300">Dosage (Optional)</label>
+                        <input type="text" id="dosage" name="dosage" class="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-lg p-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="e.g., 500mg">
+                    </div>
+                    <div>
+                        <label for="reminder-time" class="block text-sm font-medium text-gray-300">Time (24-hour)</label>
+                        <input type="time" id="reminder-time" name="reminder_time" class="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-lg p-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+                    </div>
+                </div>
+                
+                <button type="submit" id="add-reminder-btn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg shadow-md transition duration-200 ease-in-out">
+                    Add Reminder
+                </button>
+            </form>
+        </div>
+
+        <!-- Current Reminders List -->
+        <div class="bg-gray-800 p-6 rounded-lg shadow-lg">
+            <h2 class="text-2xl font-semibold text-white mb-6">Your Current Reminders</h2>
+            
+            <div id="reminder-list" class="space-y-3 max-h-96 overflow-y-auto">
+                <!-- Reminders will be dynamically injected here -->
+                <p id="no-reminders-msg" class="text-gray-400">You have no active reminders.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Get all DOM elements
+    const reminderForm = document.getElementById('reminder-form');
+    const reminderList = document.getElementById('reminder-list');
+    const noRemindersMsg = document.getElementById('no-reminders-msg');
+    const errorDiv = document.getElementById('error-message');
+    const addReminderBtn = document.getElementById('add-reminder-btn');
+    
+    // API URLs from app.py
+    const GET_REMINDERS_URL = '{{ url_for("get_reminders") }}';
+    const ADD_REMINDER_URL = '{{ url_for("add_reminder") }}';
+    const DELETE_REMINDER_URL_BASE = '{{ url_for("delete_reminder", reminder_id=0) }}'.slice(0, -1); // Gives "/api/delete_reminder/"
+
+    /**
+     * Shows an error message.
+     * @param {string} message - The error message to display.
+     */
+    function showError(message) {
+        errorDiv.textContent = message;
+        errorDiv.classList.remove('hidden');
+    }
+
+    /**
+     * Hides the error message.
+     */
+    function clearError() {
+        errorDiv.textContent = '';
+        errorDiv.classList.add('hidden');
+    }
+
+    /**
+     * Renders the list of reminders.
+     * @param {Array} reminders - An array of reminder objects.
+     */
+    function renderReminders(reminders) {
+        // Clear the current list
+        reminderList.innerHTML = '';
+        
+        if (reminders.length === 0) {
+            reminderList.appendChild(noRemindersMsg);
+            noRemindersMsg.classList.remove('hidden');
+        } else {
+            noRemindersMsg.classList.add('hidden'); // Hide the 'no reminders' message
+            reminders.forEach(reminder => {
+                const reminderEl = document.createElement('div');
+                reminderEl.className = 'bg-gray-700 p-4 rounded-lg flex justify-between items-center';
+                
+                // Format dosage text
+                const dosageText = reminder.dosage ? ` (${reminder.dosage})` : '';
+                
+                reminderEl.innerHTML = `
+                    <div>
+                        <p class="font-semibold text-white">${reminder.medicine_name}${dosageText}</p>
+                        <p class="text-sm text-blue-400">${reminder.reminder_time}</p>
+                    </div>
+                    <button data-id="${reminder.id}" class="delete-btn text-gray-400 hover:text-red-500 transition-colors">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                    </button>
+                `;
+                reminderList.appendChild(reminderEl);
+            });
+        }
+    }
+
+    /**
+     * Fetches reminders from the server and renders them.
+     */
+    async function loadReminders() {
+        try {
+            const response = await fetch(GET_REMINDERS_URL, {
+                method: 'GET',
+                credentials: 'same-origin'
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to load reminders.');
+            }
+
+            const reminders = await response.json();
+            renderReminders(reminders);
+
+        } catch (error) {
+            showError(error.message);
+        }
+    }
+
+    /**
+     * Handles the form submission to add a new reminder.
+     * @param {Event} e - The form submit event.
+     */
+    async function handleAddReminder(e) {
+        e.preventDefault(); // Stop the page from reloading
+        clearError();
+        addReminderBtn.disabled = true;
+        addReminderBtn.textContent = 'Adding...';
+
+        const formData = new FormData(reminderForm);
+        const data = {
+            medicine_name: formData.get('medicine_name'),
+            dosage: formData.get('dosage') || null, // Send null if empty
+            reminder_time: formData.get('reminder_time') // "HH:MM"
+        };
+
+        try {
+            const response = await fetch(ADD_REMINDER_URL, {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(data)
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Failed to add reminder.');
+            }
+
+            // --- THIS IS THE FIX ---
+            // Instead of just adding the new reminder, we reload the *entire* list
+            // from the database to ensure it's in sync.
+            await loadReminders();
+            // --- END OF FIX ---
+
+            // Reset the form
+            reminderForm.reset();
+
+        } catch (error) {
+            showError(error.message);
+        } finally {
+            addReminderBtn.disabled = false;
+            addReminderBtn.textContent = 'Add Reminder';
+        }
+    }
+
+    /**
+     * Handles deleting a reminder.
+     * @param {Event} e - The click event.
+     */
+    async function handleDeleteReminder(e) {
+        // Use event delegation to catch clicks on delete buttons
+        if (!e.target.closest('.delete-btn')) {
+            return;
+        }
+
+        const deleteBtn = e.target.closest('.delete-btn');
+        const reminderId = deleteBtn.dataset.id;
+        
+        // Optimistically remove from UI
+        const reminderItem = deleteBtn.parentElement;
+        reminderItem.remove();
+
+        try {
+            const response = await fetch(`${DELETE_REMINDER_URL_BASE}${reminderId}`, {
+                method: 'DELETE',
+                credentials: 'same-origin'
+            });
+
+            if (!response.ok) {
+                // If it fails, reload the list to add it back
+                throw new Error('Failed to delete reminder.');
+            }
+            
+            // Check if the list is now empty
+            if (reminderList.children.length === 0) {
+                noRemindersMsg.classList.remove('hidden');
+            }
+
+        } catch (error) {
+            showError(error.message);
+            // On error, reload the list to get the true state
+            await loadReminders();
+        }
+    }
+
+    // --- Attach Event Listeners ---
+    document.addEventListener('DOMContentLoaded', loadReminders);
+    reminderForm.addEventListener('submit', handleAddReminder);
+    reminderList.addEventListener('click', handleDeleteReminder);
+
+</script>
+{% endblock %}
