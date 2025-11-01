@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="container mx-auto max-w-5xl p-4 md:p-8 lg:p-12">
+    <h1 class="text-3xl font-bold text-white mb-6">Find a Doctor</h1>
+
+    <!-- 
+      MAP CONTAINER
+      This div will be targeted by the Leaflet.js script.
+      The size is set in base.html's <style> tag.
+    -->
+    <div id="map" class="shadow-lg mb-8"></div>
+
+    <!-- Doctor List -->
+    <h2 class="text-2xl font-semibold text-white mb-6">Nearby Clinics & Hospitals</h2>
+    <div id="doctor-list" class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <!-- Doctor cards will be dynamically injected here by the script -->
+        <p id="loading-doctors" class="text-gray-400">Loading doctors...</p>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        
+        // 1. Initialize the Map (centered on your region)
+        // Coordinates for Unnao/Lucknow area
+        const map = L.map('map').setView([26.7, 80.7], 10); 
+
+        // Add the OpenStreetMap "tile layer" (the map image)
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '© <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+        }).addTo(map);
+
+        const doctorListEl = document.getElementById('doctor-list');
+        const loadingDoctorsEl = document.getElementById('loading-doctors');
+        const getDoctorsUrl = '{{ url_for("get_doctors") }}';
+
+        // 2. Fetch Doctors from our API and Add to Map
+        async function loadDoctors() {
+            try {
+                const response = await fetch(getDoctorsUrl, {
+                    method: 'GET',
+                    credentials: 'same-origin'
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Failed to load doctor data.');
+                }
+
+                const doctors = await response.json();
+                
+                if (doctors.length === 0) {
+                    loadingDoctorsEl.textContent = 'No doctors found in the database.';
+                    return;
+                }
+
+                // Clear "loading..." message
+                doctorListEl.innerHTML = ''; 
+
+                doctors.forEach(doctor => {
+                    // Add a pin to the map
+                    L.marker([doctor.lat, doctor.lng]).addTo(map)
+                        .bindPopup(`<b>${doctor.name}</b><br>${doctor.specialty}`);
+
+                    // Create the HTML "Doctor Card"
+                    const card = document.createElement('div');
+                    card.className = 'bg-gray-800 p-6 rounded-lg shadow-lg flex flex-col justify-between';
+                    
+                    card.innerHTML = `
+                        <div>
+                            <h3 class="text-xl font-semibold text-white mb-2">${doctor.name}</h3>
+                            <p class="text-blue-400 mb-3">${doctor.specialty}</p>
+                            <p class="text-gray-300 text-sm mb-2">${doctor.address}</p>
+                            <p class="text-gray-400 text-sm mb-4">${doctor.phone}</p>
+                        </div>
+                        <a href="/book/${doctor.id}" class="mt-4 w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg shadow-md transition duration-200 ease-in-out text-center">
+                            Book Appointment
+                        </a>
+                    `;
+                    doctorListEl.appendChild(card);
+                });
+
+            } catch (error) {
+                console.error('Error loading doctors:', error);
+                loadingDoctorsEl.textContent = 'Error loading doctors. Please try again.';
+                loadingDoctorsEl.classList.add('text-red-500');
+            }
+        }
+
+        // Initial load
+        loadDoctors();
+    });
+</script>
+{% endblock %}
+

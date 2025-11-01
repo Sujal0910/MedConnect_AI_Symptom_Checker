@@ -3,10 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <!-- 
-      Tailwind Configuration 
-      This is a workaround for the environment.
-    -->
+    
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -21,24 +19,29 @@
                     }
                 }
             },
-            // Load the typography plugin for styling markdown/articles
             plugins: [
                 tailwind.plugins.typography,
             ],
         }
     </script>
-    <!-- 
-      Load the Typography plugin JS file 
-      This is loaded separately to support the config above.
-    -->
     <script src="https://cdn.tailwindcss.com/3.4.3?plugins=typography"></script>
     
     <!-- 
-      Marked.js for rendering AI's Markdown responses in chat
+      NEW: Leaflet.js (Free Map) CSS & JS
+    -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+         integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+         crossorigin=""/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+         integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+         crossorigin=""></script>
+    
+    <!-- 
+      Marked.js (for Chat Markdown)
     -->
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 
-    <title>{% block title %}MedConnect AI{% endblock %}</title>
+    <title>{% block title %}Hospitron AI{% endblock %}</title>
     
     <style>
         /* Custom scrollbar for a cleaner look in chat */
@@ -70,6 +73,15 @@
             color: #9CA3AF; /* text-gray-400 */
             border-left-color: #3B82F6; /* text-blue-500 */
         }
+        
+        /* NEW: Set a default size for the map 
+        */
+        #map { 
+            height: 400px; 
+            width: 100%;
+            border-radius: 0.5rem; /* rounded-lg */
+            z-index: 10; /* Ensure map is clickable */
+        }
     </style>
 </head>
 <body class="h-full flex flex-col font-sans text-gray-300 antialiased">
@@ -83,15 +95,19 @@
                     <svg class="h-8 w-8 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12Z" />
                     </svg>
-                    <span class="text-white text-xl font-semibold ml-2">MedConnect AI</span>
+                    <span class="text-white text-xl font.semibold ml-2">Hospitron AI</span>
                 </div>
                 
                 <!-- Navigation Links (Center) -->
                 <div class="hidden md:flex md:items-center md:space-x-4">
                     <a href="{{ url_for('index') }}" class="text-gray-300 hover:bg-gray-700 hover:text-white px-3 py-2 rounded-md text-sm font-medium">Chat</a>
                     <a href="{{ url_for('library') }}" class="text-gray-300 hover:bg-gray-700 hover:text-white px-3 py-2 rounded-md text-sm font-medium">Library</a>
-                    <!-- *** NEW REMINDER LINK *** -->
                     <a href="{{ url_for('reminders') }}" class="text-gray-300 hover:bg-gray-700 hover:text-white px-3 py-2 rounded-md text-sm font-medium">Reminders</a>
+                    
+                    <!-- *** NEW DOCTOR LINKS *** -->
+                    <a href="{{ url_for('find_doctors') }}" class="text-gray-300 hover:bg-gray-700 hover:text-white px-3 py-2 rounded-md text-sm font-medium">Find a Doctor</a>
+                    <a href="{{ url_for('my_appointments') }}" class="text-gray-300 hover:bg-gray-700 hover:text-white px-3 py-2 rounded-md text-sm font-medium">My Appointments</a>
+
                     <a href="#" id="clear-chat-btn" class="text-gray-300 hover:bg-gray-700 hover:text-white px-3 py-2 rounded-md text-sm font-medium">Clear Chat</a>
                 </div>
 
@@ -106,9 +122,21 @@
 
     <!-- Main Content Area -->
     <main class="flex-1 overflow-y-auto">
+        <!-- Flash messages -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="container mx-auto max-w-4xl p-4">
+                    {% for category, message in messages %}
+                        <div class="p-4 rounded-md {{ 'bg-green-600' if category == 'success' else 'bg-red-600' if category == 'danger' else 'bg-blue-600' }} text-white">
+                            {{ message }}
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+    
         {% block content %}{% endblock %}
     </main>
 
 </body>
 </html>
-

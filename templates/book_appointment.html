@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="container mx-auto max-w-2xl p-4 md:p-8 lg:p-12">
+    
+    <!-- Doctor Info Header -->
+    <div class="bg-gray-800 p-6 rounded-lg shadow-lg mb-8">
+        <a href="{{ url_for('find_doctors') }}" class="text-sm text-blue-400 hover:text-blue-300 mb-4 inline-block">&larr; Back to Doctor List</a>
+        <h1 class="text-3xl font-bold text-white mb-2">{{ doctor.name }}</h1>
+        <p class="text-xl text-blue-300 mb-4">{{ doctor.specialty }}</p>
+        <p class="text-gray-300 mb-2">{{ doctor.address }}</p>
+        <p class="text-gray-400">{{ doctor.phone }}</p>
+    </div>
+
+    <!-- Booking Form -->
+    <div class="bg-gray-800 p-6 rounded-lg shadow-lg">
+        <h2 class="text-2xl font-semibold text-white mb-6">Book Your Appointment</h2>
+        
+        <!-- 
+          This is a standard HTML form that reloads the page.
+          It POSTs to the /book/<doctor_id> route.
+        -->
+        <form method="POST" action="{{ url_for('book_appointment', doctor_id=doctor.id) }}" class="space-y-4">
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label for="appointment_date" class="block text-sm font-medium text-gray-300">Date</label>
+                    <!-- 
+                      min_date is passed from app.py to prevent booking in the past.
+                    -->
+                    <input type="date" id="appointment_date" name="appointment_date" 
+                           min="{{ min_date }}"
+                           class="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-lg p-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+                </div>
+                <div>
+                    <label for="appointment_time" class="block text-sm font-medium text-gray-300">Time</label>
+                    <input type="time" id="appointment_time" name="appointment_time" 
+                           class="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-lg p-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+                </div>
+            </div>
+
+            <div>
+                <label for="reason" class="block text-sm font-medium text-gray-300">Reason for Visit (Optional)</label>
+                <textarea id="reason" name="reason" rows="3" 
+                          class="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-lg p-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                          placeholder="e.g., Annual checkup, flu symptoms..."></textarea>
+            </div>
+
+            <button type-="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg shadow-md transition duration-200 ease-in-out">
+                Confirm Appointment
+            </button>
+        </form>
+    </div>
+</div>
+{% endblock %}

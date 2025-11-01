@@ -1,6 +1,6 @@
 import os
 import markdown
-import json # Import json for parsing AI responses
+import json 
 from dotenv import load_dotenv
 from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
 from flask_sqlalchemy import SQLAlchemy
@@ -8,7 +8,7 @@ from flask_login import LoginManager, UserMixin, login_user, logout_user, login_
 from flask_bcrypt import Bcrypt
 from openai import OpenAI
 from sqlalchemy.exc import IntegrityError
-from datetime import datetime, time
+from datetime import datetime, time, date
 
 # --- App Initialization ---
 load_dotenv()
@@ -44,6 +44,7 @@ class User(db.Model, UserMixin):
     password_hash = db.Column(db.String(128), nullable=False)
     chat_history = db.relationship('ChatHistory', backref='author', lazy=True, cascade="all, delete-orphan")
     reminders = db.relationship('Reminder', backref='author', lazy=True, cascade="all, delete-orphan")
+    appointments = db.relationship('Appointment', backref='patient', lazy=True, cascade="all, delete-orphan")
 
     def __repr__(self):
         return f"User('{self.name}', '{self.email}')"
@@ -86,16 +87,43 @@ class Reminder(db.Model):
             'id': self.id,
             'medicine_name': self.medicine_name,
             'dosage': self.dosage,
-            # Convert time to string in HH:MM AM/PM format
             'reminder_time': self.reminder_time.strftime('%I:%M %p')
         }
+
+class Doctor(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(150), nullable=False)
+    specialty = db.Column(db.String(150), nullable=False)
+    address = db.Column(db.String(300), nullable=False)
+    phone = db.Column(db.String(20), nullable=False)
+    latitude = db.Column(db.Float, nullable=False)
+    longitude = db.Column(db.Float, nullable=False)
+    appointments = db.relationship('Appointment', backref='doctor', lazy=True)
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'name': self.name,
+            'specialty': self.specialty,
+            'address': self.address,
+            'phone': self.phone,
+            'lat': self.latitude,
+            'lng': self.longitude
+        }
+
+class Appointment(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    appointment_datetime = db.Column(db.DateTime, nullable=False)
+    reason = db.Column(db.String(300), nullable=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    doctor_id = db.Column(db.Integer, db.ForeignKey('doctor.id'), nullable=False)
 
 
 # --- Database Initialization Command ---
 
 @app.cli.command('init-db')
 def init_db_command():
-    """Clears existing data and creates new tables, adding sample articles."""
+    """Clears existing data and creates new tables, adding sample articles and doctors."""
     with app.app_context():
         db.drop_all()
         db.create_all()
@@ -255,7 +283,7 @@ Dehydration occurs when you lose more fluid than you take in, and your body does
 - **Drink Fluids:** The best treatment is to replace lost fluids by drinking water.
 - **Electrolytes:** For more significant fluid loss (e.g., from vomiting or diarrhea), an oral rehydration solution (like Pedialyte) or sports drinks can help replace lost electrolytes.
 
-**Disclaimer:** Seek medical attention if you experience severe dehydration symptoms, such as dizziness, confusion, fainting, or inability to keep fluids down.
+**Disclaimer:** Seek immediate medical attention if you experience severe dehydration symptoms, such as dizziness, confusion, fainting, or inability to keep fluids down.
             """),
             Article(title="When to See a Doctor for a Cough", category="Symptoms", content_md="""
 **Most coughs are not serious.**
@@ -272,10 +300,46 @@ You should see a medical professional if your cough:
 **Disclaimer:** This is not an exhaustive list. If you are ever concerned about a cough or any other symptom, it is always best to consult a medical professional for an accurate diagnosis and treatment.
             """)
         ]
-        
         db.session.bulk_save_objects(articles)
+        
+        # --- UPDATED: Add ALL 9 Sample Doctors ---
+        doctors = [
+            # Your original 4
+            Doctor(name="Jai Hind Clinic", specialty="Medical Clinic", 
+                   address="Nawabganj, durga mandir road, unnao Uttar Pradesh 209859", 
+                   phone="09169457354", latitude=26.6187, longitude=80.6712),
+            Doctor(name="SHASHWAT Dental Hospital Clinic", specialty="Dental Clinic", 
+                   address="block (kshtera panchayat, Nawabganj, Kanpur Rd, Unnao, Uttar Pradesh 209859", 
+                   phone="08090310358", latitude=26.6166, longitude=80.6725),
+            Doctor(name="Dr.Vineet Tiwari", specialty="General Physician", 
+                   address="Lucknow, Kanpur - Lucknow Rd, near shiv mandir, Mawaiyya, Lucknow, Uttar Pradesh 209859", 
+                   phone="09415518286", latitude=26.8143, longitude=80.8924),
+            Doctor(name="Shri Ram Murti Smarak Hospital", specialty="Hospital", 
+                   address="JJPGH+XG8, Allahabad Highway, Kanpur, Unnao, Ashakhera, Uttar Pradesh 209859", 
+                   phone="05143278408", latitude=26.6249, longitude=80.5788),
+            
+            # Your 5 new ones
+            Doctor(name="Sanjay Gandhi Post Graduate Institute (SGPGI)", specialty="Multi-Specialty Institute",
+                   address="Raebareli Road, Haibat Mau Mawaiya, Pushpendra Nagar, Lucknow, Uttar Pradesh, 226014",
+                   phone="0522-2494000", latitude=26.7588, longitude=80.9488),
+            Doctor(name="Medanta Super Speciality Hospital", specialty="Multi-Specialty Hospital",
+                   address="Sector - A, Pocket - 1, Amar Shaheed Path, Golf City, Lucknow, Uttar Pradesh, 226030",
+                   phone="+91 522 450 5050", latitude=26.7766, longitude=80.9885),
+            Doctor(name="Saraswati Medical College and Hospital", specialty="Medical College & Hospital",
+                   address="LIDA, Madhu Vihar, P.O. Asha Khera, NH-27, Lucknow-Kanpur Highway, Unnao (UP), 209859",
+                   phone="0515-3510001", latitude=26.5866, longitude=80.6053),
+            Doctor(name="Shine Multispeciality Hospital", specialty="Multi-Specialty Hospital",
+                   address="Behind Utsav Bhog Dhaba, Kanpur Road, Junab Ganj, Lucknow, Uttar Pradesh, 226401",
+                   phone="N/A", latitude=26.6852, longitude=80.7936),
+            Doctor(name="Surya Hospital & Trauma Center", specialty="Hospital & Trauma Care",
+                   address="Sector - I, L.D.A. Colony, Near Khazana Market, Kanpur Road Scheme (Aashiana), Lucknow, 226012",
+                   phone="0522-4074044", latitude=26.7934, longitude=80.9080)
+        ]
+        db.session.bulk_save_objects(doctors)
+        
         db.session.commit()
-        print('Initialized the database and added 10 sample articles.')
+        print('Initialized the database, added 10 sample articles, and 9 sample doctors.')
+
 
 # --- User Loader for Flask-Login ---
 
@@ -304,7 +368,6 @@ def signup():
             flash('All fields are required.', 'danger')
             return redirect(url_for('signup'))
         
-        # Check for existing user
         existing_user = User.query.filter_by(email=email).first()
         if existing_user:
             flash('That email is already taken. Please log in.', 'warning')
@@ -406,7 +469,7 @@ def ask():
     user_message = ChatHistory(role='user', content=user_message_content, author=current_user)
     db.session.add(user_message)
     
-    # --- NEW: System Prompt with Function Calling ---
+    # --- System Prompt with Reminder Function ---
     system_prompt = {
         "role": "system",
         "content": (
@@ -416,7 +479,8 @@ def ask():
             "If the user asks about anything else (like sports, history, movies, or general knowledge), you must politely decline with a message like: "
             "'I'm sorry, I'm a medical assistant and can only answer questions about your health and wellness. How are you feeling today?'"
             "\n- Your persona: You are 'MedConnect AI'. You are NOT a doctor and must NEVER provide a diagnosis. "
-            "Always end your (health-related) response with a clear, friendly disclaimer: 'Please remember, I am an AI, not a medical professional. It's always best to consult a doctor for a proper diagnosis.You must consult a qualified healthcare professional ,such as a doctor or pharmacist ,before taking any medications'"
+            "Always end your (health-related) response with a clear, friendly disclaimer: 'Please remember, I am an AI, not a medical professional. It's always best to consult a doctor for a proper diagnosis.'"
+            
             "\n\n**TASK 2: Reminder Assistant**"
             "\n- If the user asks to set a medicine reminder, your goal is to collect three pieces of information: `medicine_name`, `dosage` (optional), and `time` (in 24-hour HH:MM format)."
             "\n- Ask for any missing information. If the user just says 'remind me to take my pill at 8', you must ask 'What is the medicine's name?' and 'Is that 8 AM or 8 PM? Please provide the time in 24-hour HH:MM format, like 08:00 or 20:00.'"
@@ -431,33 +495,32 @@ def ask():
     
     # Fetch recent history
     recent_history = ChatHistory.query.filter_by(user_id=current_user.id).order_by(ChatHistory.timestamp.desc()).limit(10).all()
-    recent_history.reverse() # Put in chronological order
+    recent_history.reverse() 
     
+    # Add the *new* user message to the history before sending it to the AI
     messages = [system_prompt] + [{"role": msg.role, "content": msg.content} for msg in recent_history]
+    messages.append({"role": "user", "content": user_message_content})
 
     # Get AI response
     ai_response_content = get_openrouter_response(messages)
     
-    # --- NEW: Check for Function Call ---
+    # Check for Function Call
     try:
         # Check if the response is our special JSON string
         data = json.loads(ai_response_content)
         
         if data.get('action') == 'create_reminder':
-            # It's a reminder! Let's process it.
             med_name = data.get('medicine')
             dosage = data.get('dosage')
             time_str = data.get('time')
 
             if dosage == "None":
-                dosage = None # Convert string "None" to Python's None
+                dosage = None 
             
             if not med_name or not time_str:
-                # The AI failed to extract data, send a normal error
                 ai_response_content = "I'm sorry, I missed some of those details. Could you please provide the medicine name and time again?"
             else:
                 try:
-                    # Convert "HH:MM" string to a Python time object
                     reminder_time_obj = time.fromisoformat(time_str)
                     
                     new_reminder = Reminder(
@@ -468,8 +531,7 @@ def ask():
                     )
                     db.session.add(new_reminder)
                     
-                    # Craft our *own* friendly confirmation message
-                    time_friendly = reminder_time_obj.strftime('%I:%M %p') # e.g., "08:00 AM"
+                    time_friendly = reminder_time_obj.strftime('%I:%M %p') 
                     dosage_text = f" ({dosage})" if dosage else ""
                     ai_response_content = f"OK, I've set a reminder for {med_name}{dosage_text} at {time_friendly}. You can see all your reminders on the 'Reminders' page."
 
@@ -482,16 +544,13 @@ def ask():
 
     except (json.JSONDecodeError, TypeError):
         # It's a normal chat message, not a JSON object.
-        # We don't need to do anything, just let it proceed.
         pass
     
-    # --- End of New Logic ---
-
-    # Save AI response (either the original one or our new confirmation message)
+    # Save AI response
     ai_message = ChatHistory(role='assistant', content=ai_response_content, author=current_user)
     db.session.add(ai_message)
     
-    # Commit user message + AI message
+    # Commit
     try:
         db.session.commit()
     except Exception as e:
@@ -519,14 +578,12 @@ def clear_chat():
 @app.route('/reminders')
 @login_required
 def reminders():
-    # The page itself is simple, all data is loaded via API
     return render_template('reminders.html', title='Medicine Reminders')
 
 @app.route('/api/get_reminders', methods=['GET'])
 @login_required
 def get_reminders():
     reminders = Reminder.query.filter_by(user_id=current_user.id).order_by(Reminder.reminder_time).all()
-    # Convert list of Reminder objects to list of dictionaries
     return jsonify([r.to_dict() for r in reminders])
 
 @app.route('/api/add_reminder', methods=['POST'])
@@ -536,12 +593,11 @@ def add_reminder():
     try:
         med_name = data.get('medicine_name')
         dosage = data.get('dosage')
-        time_str = data.get('reminder_time') # Expected format: "HH:MM" (24-hour)
+        time_str = data.get('reminder_time') 
 
         if not med_name or not time_str:
             return jsonify({"error": "Medicine name and time are required."}), 400
         
-        # Convert "HH:MM" string to a Python time object
         reminder_time_obj = time.fromisoformat(time_str)
         
         new_reminder = Reminder(
@@ -553,7 +609,6 @@ def add_reminder():
         db.session.add(new_reminder)
         db.session.commit()
         
-        # Return the newly created reminder so the frontend can add it to the list
         return jsonify(new_reminder.to_dict()), 201
         
     except ValueError:
@@ -569,7 +624,6 @@ def delete_reminder(reminder_id):
     try:
         reminder = Reminder.query.get_or_404(reminder_id)
         
-        # Security check: make sure the reminder belongs to the logged-in user
         if reminder.user_id != current_user.id:
             return jsonify({"error": "Unauthorized"}), 403
             
@@ -582,6 +636,98 @@ def delete_reminder(reminder_id):
         app.logger.error(f"Error deleting reminder: {e}")
         return jsonify({"error": "An internal error occurred."}), 500
 
+# --- NEW: Doctor & Appointment Routes ---
+
+@app.route('/find_doctors')
+@login_required
+def find_doctors():
+    return render_template('find_doctors.html', title="Find a Doctor")
+
+@app.route('/api/get_doctors', methods=['GET'])
+@login_required
+def get_doctors():
+    doctors = Doctor.query.all()
+    return jsonify([d.to_dict() for d in doctors])
+
+@app.route('/book/<int:doctor_id>', methods=['GET', 'POST'])
+@login_required
+def book_appointment(doctor_id):
+    doctor = db.session.get(Doctor, doctor_id)
+    if not doctor:
+        flash('Doctor not found.', 'danger')
+        return redirect(url_for('find_doctors'))
+    
+    if request.method == 'POST':
+        date_str = request.form.get('appointment_date')
+        time_str = request.form.get('appointment_time')
+        reason = request.form.get('reason')
+        
+        if not date_str or not time_str:
+            flash('Please select a valid date and time.', 'danger')
+            return redirect(url_for('book_appointment', doctor_id=doctor_id))
+
+        try:
+            appointment_dt_str = f"{date_str} {time_str}"
+            appointment_datetime = datetime.strptime(appointment_dt_str, '%Y-%m-%d %H:%M')
+
+            if appointment_datetime < datetime.now():
+                flash('You cannot book an appointment in the past.', 'danger')
+                return redirect(url_for('book_appointment', doctor_id=doctor_id))
+
+            new_appointment = Appointment(
+                appointment_datetime=appointment_datetime,
+                reason=reason,
+                patient=current_user,
+                doctor=doctor
+            )
+            
+            db.session.add(new_appointment)
+            db.session.commit()
+            
+            flash('Your appointment has been successfully booked!', 'success')
+            return redirect(url_for('my_appointments'))
+
+        except ValueError:
+            flash('Invalid date or time format.', 'danger')
+        except Exception as e:
+            db.session.rollback()
+            app.logger.error(f"Error booking appointment: {e}")
+            flash('An error occurred while booking. Please try again.', 'danger')
+
+    min_date = date.today().isoformat()
+    return render_template('book_appointment.html', title=f"Book with {doctor.name}", doctor=doctor, min_date=min_date)
+
+
+@app.route('/my_appointments')
+@login_required
+def my_appointments():
+    appointments = Appointment.query.filter_by(user_id=current_user.id).order_by(Appointment.appointment_datetime.asc()).all()
+    return render_template('my_appointments.html', title="My Appointments", appointments=appointments)
+
+@app.route('/cancel_appointment/<int:appointment_id>', methods=['POST'])
+@login_required
+def cancel_appointment(appointment_id):
+    try:
+        appointment = Appointment.query.get_or_404(appointment_id)
+        
+        if appointment.user_id != current_user.id:
+            flash('You are not authorized to cancel this appointment.', 'danger')
+            return redirect(url_for('my_appointments'))
+        
+        if appointment.appointment_datetime < datetime.now():
+            flash('You cannot cancel an appointment that has already passed.', 'warning')
+            return redirect(url_for('my_appointments'))
+            
+        db.session.delete(appointment)
+        db.session.commit()
+        flash('Your appointment has been cancelled.', 'success')
+        
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error(f"Error cancelling appointment: {e}")
+        flash('An error occurred while cancelling the appointment.', 'danger')
+        
+    return redirect(url_for('my_appointments'))
 
 # --- Main Run ---
 if __name__ == '__main__':
