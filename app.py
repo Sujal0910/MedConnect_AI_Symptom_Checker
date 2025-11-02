@@ -25,10 +25,9 @@ app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(instance_pat
 db = SQLAlchemy(app)
 bcrypt = Bcrypt(app)
 login_manager = LoginManager(app)
-# --- UPDATED: Redirect to the new landing page ---
 login_manager.login_view = 'landing' 
 login_manager.login_message = 'Please log in or sign up to access the app.'
-login_manager.login_message_category = 'info' # This category will be used for styling flash messages
+login_manager.login_message_category = 'info' 
 
 # --- OpenRouter AI Client ---
 OPENROUTER_API_KEY = os.environ.get('OPENROUTER_API_KEY')
@@ -37,7 +36,7 @@ client = OpenAI(
     api_key=OPENROUTER_API_KEY,
 )
 
-# --- Database Models (No Changes) ---
+# --- Database Models ---
 
 class User(db.Model, UserMixin):
     id = db.Column(db.Integer, primary_key=True)
@@ -109,18 +108,16 @@ class Appointment(db.Model):
     doctor_id = db.Column(db.Integer, db.ForeignKey('doctor.id'), nullable=False)
 
 
-# --- Database Initialization Command (No Changes) ---
+# --- Database Initialization Functions (RE-ORDERED FOR FIX) ---
 
-@app.cli.command('init-db')
-def init_db_command():
-    """Clears existing data and creates new tables, adding sample articles and doctors."""
-    with app.app_context():
-        db.drop_all()
-        db.create_all()
-        
-        # --- Full Article Content Added ---
-        articles = [
-            Article(title="Understanding the Common Cold", category="Common Illness", content_md="""
+def _init_db():
+    """Internal function to create tables and add data. This is what we will call from our secret route."""
+    db.drop_all()
+    db.create_all()
+    
+    # --- THIS IS THE FIX: Full Article Content Added ---
+    articles = [
+        Article(title="Understanding the Common Cold", category="Common Illness", content_md="""
 **What is a common cold?**
 The common cold is a viral infection of your nose and throat (upper respiratory tract). It's usually harmless, although it might not feel that way.
 
@@ -139,8 +136,8 @@ The common cold is a viral infection of your nose and throat (upper respiratory 
 - **Symptom Relief:** Over-the-counter pain-relievers, decongestants, and cough syrups can help manage symptoms.
 
 **Disclaimer:** This is for informational purposes only. Always consult a medical professional for diagnosis and treatment.
-            """),
-            Article(title="First Aid for Minor Burns", category="First Aid", content_md="""
+        """),
+        Article(title="First Aid for Minor Burns", category="First Aid", content_md="""
 **What is a minor burn?**
 A minor burn (first-degree or mild second-degree) is one that is small (less than 3 inches), superficial, and does not cover a major joint or sensitive area like the face.
 
@@ -156,8 +153,8 @@ A minor burn (first-degree or mild second-degree) is one that is small (less tha
 - **Do NOT** break any blisters that form, as this can lead to infection.
 
 **Disclaimer:** Seek immediate medical attention for any burns that are large, deep, on the face/hands/feet/genitals, or caused by chemicals or electricity.
-            """),
-            Article(title="What is a Fever?", category="Symptoms", content_md="""
+        """),
+        Article(title="What is a Fever?", category="Symptoms", content_md="""
 **What is a fever?**
 A fever is a temporary increase in your body temperature, often due to an illness. A fever is a sign that something out of the ordinary is going on in your body. For an adult, a fever may be uncomfortable, but it usually isn't a cause for concern unless it reaches 103 F (39.4 C) or higher.
 
@@ -173,8 +170,8 @@ A fever is a temporary increase in your body temperature, often due to an illnes
 - **Medication:** Over-the-counter medications like acetaminophen or ibuprofen can help reduce a fever.
 
 **Disclaimer:** While most fevers are harmless, you should consult a doctor if your fever is unusually high, lasts for more than a few days, or is accompanied by severe symptoms like a stiff neck, confusion, or difficulty breathing.
-            """),
-            Article(title="The Importance of Handwashing", category="Wellness", content_md="""
+        """),
+        Article(title="The Importance of Handwashing", category="Wellness", content_md="""
 **Why is handwashing important?**
 Handwashing is one of the easiest and most effective ways to prevent the spread of germs and stay healthy. Your hands touch many surfaces and can pick up germs, which can then be transferred to your eyes, nose, or mouth.
 
@@ -194,8 +191,8 @@ Handwashing is one of the easiest and most effective ways to prevent the spread 
 5.  **Dry:** Dry your hands using a clean towel or air dryer.
 
 **Disclaimer:** This is general health advice. Handwashing is a key part of hygiene but does not replace other medical advice.
-            """),
-            Article(title="Understanding Mild Sprains", category="First Aid", content_md="""
+        """),
+        Article(title="Understanding Mild Sprains", category="First Aid", content_md="""
 **What is a sprain?**
 A sprain is a stretching or tearing of ligaments — the tough bands of fibrous tissue that connect two bones in your joints. The most common location for a sprain is in your ankle.
 
@@ -213,8 +210,8 @@ For the first 24-48 hours, the best treatment for a mild sprain is the R.I.C.E. 
 - **Elevation:** Elevate the injured joint above the level of your heart, especially at night.
 
 **Disclaimer:** Seek medical advice if you cannot put weight on the joint or if the pain and swelling are severe or do not improve after 2-3 days.
-            """),
-            Article(title="Tips for a Healthy Diet", category="Wellness", content_md="""
+        """),
+        Article(title="Tips for a Healthy Diet", category="Wellness", content_md="""
 **What is a healthy diet?**
 A healthy diet is one that helps to maintain or improve overall health. It provides the body with essential nutrition: fluid, macronutrients, micronutrients, and adequate calories.
 
@@ -226,8 +223,8 @@ A healthy diet is one that helps to maintain or improve overall health. It provi
 5.  **Listen to Your Body:** Eat when you're hungry and stop when you're full.
 
 **Disclaimer:** This is general dietary advice. For specific nutritional needs, allergies, or health conditions, please consult a registered dietitian or medical professional.
-            """),
-            Article(title="The Benefits of Regular Exercise", category="Wellness", content_md="""
+        """),
+        Article(title="The Benefits of Regular Exercise", category="Wellness", content_md="""
 **Why exercise?**
 Regular physical activity is one of the most important things you can do for your health. It can help:
 - Control your weight
@@ -241,8 +238,8 @@ Regular physical activity is one of the most important things you can do for you
 Aim for at least 150 minutes of moderate-intensity aerobic activity (like brisk walking or swimming) or 75 minutes of vigorous-intensity activity (like running) each week, spread throughout the week. Also, include muscle-strengthening activities on 2 or more days a week.
 
 **Disclaimer:** Before starting any new exercise program, it's important to consult with your doctor, especially if you have any pre-existing health conditions.
-            """),
-            Article(title="Managing Stress", category="Wellness", content_md="""
+        """),
+        Article(title="Managing Stress", category="Wellness", content_md="""
 **What is stress?**
 Stress is your body's reaction to a challenge or demand. In short bursts, stress can be positive, such as when it helps you avoid danger. But when stress lasts for a long time, it may harm your health.
 
@@ -255,8 +252,8 @@ Stress is your body's reaction to a challenge or demand. In short bursts, stress
 - **Healthy Habits:** Eat a balanced diet, get enough sleep, and limit alcohol and caffeine.
 
 **Disclaimer:** If you are feeling overwhelmed by stress or it is impacting your daily life, please seek help from a qualified mental health professional.
-            """),
-            Article(title="Understanding Dehydration", category="Symptoms", content_md="""
+        """),
+        Article(title="Understanding Dehydration", category="Symptoms", content_md="""
 **What is dehydration?**
 Dehydration occurs when you lose more fluid than you take in, and your body doesn't have enough water and other fluids to carry out its normal functions.
 
@@ -274,8 +271,8 @@ Dehydration occurs when you lose more fluid than you take in, and your body does
 - **Electrolytes:** For more significant fluid loss (e.g., from vomiting or diarrhea), an oral rehydration solution (like Pedialyte) or sports drinks can help replace lost electrolytes.
 
 **Disclaimer:** Seek immediate medical attention if you experience severe dehydration symptoms, such as dizziness, confusion, fainting, or inability to keep fluids down.
-            """),
-            Article(title="When to See a Doctor for a Cough", category="Symptoms", content_md="""
+        """),
+        Article(title="When to See a Doctor for a Cough", category="Symptoms", content_md="""
 **Most coughs are not serious.**
 A cough is a common reflex action that clears your throat of mucus or foreign irritants. Most coughs are caused by the common cold or flu and will go away on their own.
 
@@ -288,45 +285,50 @@ You should see a medical professional if your cough:
 - Is accompanied by unexplained weight loss
 
 **Disclaimer:** This is not an exhaustive list. If you are ever concerned about a cough or any other symptom, it is always best to consult a medical professional for an accurate diagnosis and treatment.
-            """)
-        ]
-        db.session.bulk_save_objects(articles)
-        
-        # --- Add ALL 9 Sample Doctors ---
-        doctors = [
-            Doctor(name="Jai Hind Clinic", specialty="Medical Clinic", 
-                   address="Nawabganj, durga mandir road, unnao Uttar Pradesh 209859", 
-                   phone="09169457354", latitude=26.6187, longitude=80.6712),
-            Doctor(name="SHASHWAT Dental Hospital Clinic", specialty="Dental Clinic", 
-                   address="block (kshtera panchayat, Nawabganj, Kanpur Rd, Unnao, Uttar Pradesh 209859", 
-                   phone="08090310358", latitude=26.6166, longitude=80.6725),
-            Doctor(name="Dr.Vineet Tiwari", specialty="General Physician", 
-                   address="Lucknow, Kanpur - Lucknow Rd, near shiv mandir, Mawaiyya, Lucknow, Uttar Pradesh 209859", 
-                   phone="09415518286", latitude=26.8143, longitude=80.8924),
-            Doctor(name="Shri Ram Murti Smarak Hospital", specialty="Hospital", 
-                   address="JJPGH+XG8, Allahabad Highway, Kanpur, Unnao, Ashakhera, Uttar Pradesh 209859", 
-                   phone="05143278408", latitude=26.6249, longitude=80.5788),
-            Doctor(name="Sanjay Gandhi Post Graduate Institute (SGPGI)", specialty="Multi-Specialty Institute",
-                   address="Raebareli Road, Haibat Mau Mawaiya, Pushpendra Nagar, Lucknow, Uttar Pradesh, 226014",
-                   phone="0522-2494000", latitude=26.7588, longitude=80.9488),
-            Doctor(name="Medanta Super Speciality Hospital", specialty="Multi-Specialty Hospital",
-                   address="Sector - A, Pocket - 1, Amar Shaheed Path, Golf City, Lucknow, Uttar Pradesh, 226030",
-                   phone="+91 522 450 5050", latitude=26.7766, longitude=80.9885),
-            Doctor(name="Saraswati Medical College and Hospital", specialty="Medical College & Hospital",
-                   address="LIDA, Madhu Vihar, P.O. Asha Khera, NH-27, Lucknow-Kanpur Highway, Unnao (UP), 209859",
-                   phone="0515-3510001", latitude=26.5866, longitude=80.6053),
-            Doctor(name="Shine Multispeciality Hospital", specialty="Multi-Specialty Hospital",
-                   address="Behind Utsav Bhog Dhaba, Kanpur Road, Junab Ganj, Lucknow, Uttar Pradesh, 226401",
-                   phone="N/A", latitude=26.6852, longitude=80.7936),
-            Doctor(name="Surya Hospital & Trauma Center", specialty="Hospital & Trauma Care",
-                   address="Sector - I, L.D.A. Colony, Near Khazana Market, Kanpur Road Scheme (Aashiana), Lucknow, 226012",
-                   phone="0522-4074044", latitude=26.7934, longitude=80.9080)
-        ]
-        db.session.bulk_save_objects(doctors)
-        
-        db.session.commit()
-        print('Initialized the database, added 10 sample articles, and 9 sample doctors.')
+        """)
+    ]
+    db.session.bulk_save_objects(articles)
+    
+    # --- Add ALL 9 Sample Doctors ---
+    doctors = [
+        Doctor(name="Jai Hind Clinic", specialty="Medical Clinic", 
+               address="Nawabganj, durga mandir road, unnao Uttar Pradesh 209859", 
+               phone="09169457354", latitude=26.6187, longitude=80.6712),
+        Doctor(name="SHASHWAT Dental Hospital Clinic", specialty="Dental Clinic", 
+               address="block (kshtera panchayat, Nawabganj, Kanpur Rd, Unnao, Uttar Pradesh 209859", 
+               phone="08090310358", latitude=26.6166, longitude=80.6725),
+        Doctor(name="Dr.Vineet Tiwari", specialty="General Physician", 
+               address="Lucknow, Kanpur - Lucknow Rd, near shiv mandir, Mawaiyya, Lucknow, Uttar Pradesh 209859", 
+               phone="09415518286", latitude=26.8143, longitude=80.8924),
+        Doctor(name="Shri Ram Murti Smarak Hospital", specialty="Hospital", 
+               address="JJPGH+XG8, Allahabad Highway, Kanpur, Unnao, Ashakhera, Uttar Pradesh 209859", 
+               phone="05143278408", latitude=26.6249, longitude=80.5788),
+        Doctor(name="Sanjay Gandhi Post Graduate Institute (SGPGI)", specialty="Multi-Specialty Institute",
+               address="Raebareli Road, Haibat Mau Mawaiya, Pushpendra Nagar, Lucknow, Uttar Pradesh, 226014",
+               phone="0522-2494000", latitude=26.7588, longitude=80.9488),
+        Doctor(name="Medanta Super Speciality Hospital", specialty="Multi-Specialty Hospital",
+               address="Sector - A, Pocket - 1, Amar Shaheed Path, Golf City, Lucknow, Uttar Pradesh, 226030",
+               phone="+91 522 450 5050", latitude=26.7766, longitude=80.9885),
+        Doctor(name="Saraswati Medical College and Hospital", specialty="Medical College & Hospital",
+               address="LIDA, Madhu Vihar, P.O. Asha Khera, NH-27, Lucknow-Kanpur Highway, Unnao (UP), 209859",
+               phone="0515-3510001", latitude=26.5866, longitude=80.6053),
+        Doctor(name="Shine Multispeciality Hospital", specialty="Multi-Specialty Hospital",
+               address="Behind Utsav Bhog Dhaba, Kanpur Road, Junab Ganj, Lucknow, Uttar Pradesh, 226401",
+               phone="N/A", latitude=26.6852, longitude=80.7936),
+        Doctor(name="Surya Hospital & Trauma Center", specialty="Hospital & Trauma Care",
+               address="Sector - I, L.D.A. Colony, Near Khazana Market, Kanpur Road Scheme (Aashiana), Lucknow, 226012",
+               phone="0522-4074044", latitude=26.7934, longitude=80.9080)
+    ]
+    db.session.bulk_save_objects(doctors)
+    
+    db.session.commit()
 
+@app.cli.command('init-db')
+def init_db_command():
+    """Clears existing data and creates new tables, adding sample articles and doctors."""
+    with app.app_context():
+        _init_db()
+        print('Initialized the database, added 10 sample articles, and 9 sample doctors.')
 
 # --- User Loader for Flask-Login ---
 
@@ -334,29 +336,27 @@ You should see a medical professional if your cough:
 def load_user(user_id):
     return User.query.get(int(user_id))
 
-# --- Main App Routes (NOW UPDATED FOR UI/UX) ---
+# --- Main App Routes ---
 
 @app.route('/')
 def landing():
     """Our new public-facing 3D landing page."""
     if current_user.is_authenticated:
         return redirect(url_for('dashboard'))
-    # Pass 'form' parameter to template to show login/signup
-    form_to_show = request.args.get('form', None) # Default to no form
-    return render_template('landing.html', title='Welcome to MedConnect AI', form_to_show=form_to_show)
+    form_to_show = request.args.get('form', None) 
+    return render_template('landing.html', title='Welcome to Medullose', form_to_show=form_to_show)
 
 @app.route('/dashboard')
 @login_required
 def dashboard():
     """This is the new 'homepage' after logging in."""
-    # We'll send the user to the 'find_doctors' page as it's the most visual
-    return redirect(url_for('find_doctors'))
+    return redirect(url_for('find_doctors')) # Go to the visual map page
 
 @app.route('/chat')
 @login_required
 def chat():
     """The main chat interface."""
-    return render_template('index.html', title='Chat - MedConnect AI')
+    return render_template('index.html', title='Chat - Medullose')
 
 @app.route('/signup', methods=['GET', 'POST'])
 def signup():
@@ -395,7 +395,6 @@ def signup():
             flash('A server error occurred. Please try again later.', 'danger')
             return redirect(url_for('landing', form='signup'))
 
-    # If GET request, just show the landing page with signup
     return redirect(url_for('landing', form='signup'))
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -411,14 +410,12 @@ def login():
         
         if user and bcrypt.check_password_hash(user.password_hash, password):
             login_user(user, remember=True)
-            # Redirect to the intended page or the dashboard
             next_page = request.args.get('next')
             return redirect(next_page or url_for('dashboard'))
         else:
             flash('Login unsuccessful. Please check your email and password.', 'danger')
             return redirect(url_for('landing', form='login'))
             
-    # If GET request, just show the landing page with login
     return redirect(url_for('landing', form='login'))
 
 @app.route('/logout')
@@ -426,9 +423,9 @@ def login():
 def logout():
     logout_user()
     flash('You have been logged out.', 'info')
-    return redirect(url_for('landing')) # Redirect to the new landing page
+    return redirect(url_for('landing')) 
 
-# --- Verified Health Library Routes (No Changes) ---
+# --- Verified Health Library Routes ---
 
 @app.route('/library')
 @login_required
@@ -446,7 +443,7 @@ def article_detail(article_id):
     
     return render_template('article_detail.html', title=article.title, article=article)
 
-# --- Chat API Routes (No Changes) ---
+# --- Chat API Routes ---
 
 def get_openrouter_response(messages):
     """Gets a response from the OpenRouter API."""
@@ -484,20 +481,15 @@ def ask():
             "You have two tasks. First, be a helpful medical AI. Second, be a reminder assistant."
             "\n\n**TASK 1: Medical AI**"
             "\n- **YOUR MOST IMPORTANT RULE:** You MUST refuse to answer any questions that are not related to health, medicine, wellness, or symptoms. "
-            "If the user asks about anything else (like sports, history, movies, or general knowledge), you must politely decline with a message like: "
-            "'I'm sorry, I'm a medical assistant and can only answer questions about your health and wellness. How are you feeling today?'"
-            "\n- Your persona: You are 'MedConnect AI'. You are NOT a doctor and must NEVER provide a diagnosis. "
+            "If the user asks about anything else, you must politely decline."
+            "\n- Your persona: You are 'Medullose AI'. You are NOT a doctor and must NEVER provide a diagnosis. "
             "Always end your (health-related) response with a clear, friendly disclaimer: 'Please remember, I am an AI, not a medical professional. It's always best to consult a doctor for a proper diagnosis.'"
             
             "\n\n**TASK 2: Reminder Assistant**"
             "\n- If the user asks to set a medicine reminder, your goal is to collect three pieces of information: `medicine_name`, `dosage` (optional), and `time` (in 24-hour HH:MM format)."
-            "\n- Ask for any missing information. If the user just says 'remind me to take my pill at 8', you must ask 'What is the medicine's name?' and 'Is that 8 AM or 8 PM? Please provide the time in 24-hour HH:MM format, like 08:00 or 20:00.'"
+            "\n- Ask for any missing information."
             "\n- Once you have the required info, you **MUST** respond *only* with a special JSON-like string and nothing else."
             "\n- **JSON Format:** `{\"action\": \"create_reminder\", \"medicine\": \"...\", \"dosage\": \"...\", \"time\": \"HH:MM\"}`"
-            "\n- If `dosage` is not specified, set its value to `None` (as a string: \"None\")."
-            "\n- **Example 1:** `{\"action\": \"create_reminder\", \"medicine\": \"Paracetamol\", \"dosage\": \"500mg\", \"time\": \"08:00\"}`"
-            "\n- **Example 2:** `{\"action\": \"create_reminder\", \"medicine\": \"Aspirin\", \"dosage\": \"None\", \"time\": \"14:30\"}`"
-            "\n- Only respond with this JSON string. The system will handle the confirmation."
         )
     }
     
@@ -727,12 +719,14 @@ def cancel_appointment(appointment_id):
         flash('An error occurred while cancelling the appointment.', 'danger')
         
     return redirect(url_for('my_appointments'))
+
+# --- NEW: Secret route to initialize the database on Render ---
 @app.route('/admin/super-secret-init-db')
 def secret_init_db():
     # This is a simple security measure. 
     # For a real app, you'd want a better password system.
     secret_key = request.args.get('key')
-    if secret_key == 'medullose-admin-12345':
+    if secret_key == 'medullose-admin-12345': # Key updated to 'medullose'
         try:
             with app.app_context():
                 _init_db()
