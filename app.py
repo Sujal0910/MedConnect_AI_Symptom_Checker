@@ -727,6 +727,20 @@ def cancel_appointment(appointment_id):
         flash('An error occurred while cancelling the appointment.', 'danger')
         
     return redirect(url_for('my_appointments'))
+@app.route('/admin/super-secret-init-db')
+def secret_init_db():
+    # This is a simple security measure. 
+    # For a real app, you'd want a better password system.
+    secret_key = request.args.get('key')
+    if secret_key == 'medullose-admin-12345':
+        try:
+            with app.app_context():
+                _init_db()
+            return "DATABASE INITIALIZED SUCCESSFULLY."
+        except Exception as e:
+            return f"An error occurred: {e}"
+    else:
+        return "Not authorized.", 403
 
 # --- Main Run ---
 if __name__ == '__main__':
