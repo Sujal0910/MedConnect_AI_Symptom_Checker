@@ -1,35 +1,41 @@
 {% extends "base.html" %}
 
-{% block title %}{{ article.title }} - MedConnect AI{% endblock %}
+{% block title %}{{ title }}{% endblock %}
 
 {% block content %}
-<div class="container mx-auto px-4 py-8 md:py-12 lg:py-16">
-    <div class="max-w-4xl mx-auto bg-gray-800 rounded-xl shadow-xl p-6 md:p-10 border border-gray-700">
+<!-- NEW: Light-mode container -->
+<div class="container mx-auto max-w-3xl p-4 md:p-8 lg:p-12">
+
+    <!-- 
+      NEW: Re-skinned white card for content
+    -->
+    <div class="bg-white p-6 md:p-10 rounded-lg shadow-lg border border-brand-stone border-opacity-20">
         
-        <!-- Back Button -->
-        <a href="{{ url_for('library') }}" class="text-blue-400 hover:text-blue-300 transition duration-150 flex items-center mb-6">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-            </svg>
-            ← Back to Library
-        </a>
+        <!-- Back Link -->
+        <!-- NEW: Blue link (as requested) -->
+        <a href="{{ url_for('library') }}" class="text-sm text-blue-600 hover:underline mb-4 inline-block">&larr; Back to Library</a>
+        
+        <!-- Header -->
+        <!-- NEW: Golden accent-colored category tag -->
+        <span class="inline-block bg-brand-golden bg-opacity-10 text-brand-golden text-xs font-semibold px-3 py-1 rounded-full mb-3">{{ article.category }}</span>
+        <!-- NEW: Forest heading -->
+        <h1 class="text-3xl font-bold text-brand-forest mb-6">{{ article.title }}</h1>
 
-        <!-- Category Tag -->
-        <span class="inline-block bg-blue-600 text-white text-xs font-semibold px-3 py-1 rounded-full uppercase tracking-wider mb-3">
-            {{ article.category }}
-        </span>
+        <!-- Medical Disclaimer Box -->
+        <!-- NEW: Red signal color (as requested) -->
+        <div class="bg-red-100 border-l-4 border-red-500 text-red-800 p-4 rounded-r-lg mb-8" role="alert">
+            <h4 class="font-bold">Medical Disclaimer</h4>
+            <p class="text-sm">This article is for informational purposes only and does not constitute medical advice. Always consult a professional healthcare provider with any questions you may have regarding a medical condition.</p>
+        </div>
 
-        <!-- Title -->
-        <h1 class="text-4xl font-extrabold text-white mb-6 border-b border-gray-700 pb-3">
-            {{ article.title }}
-        </h1>
-
-        <!-- Article Content - THIS IS THE FIX -->
-        <div class="prose prose-invert max-w-none text-gray-300">
-            <!-- Renders the Markdown content as safe HTML -->
+        <!-- 
+          Article Content
+          NEW: Applies the 'prose-custom' class for light-mode formatting
+        -->
+        <div class="prose prose-custom max-w-none">
             {{ article.content_html | safe }}
         </div>
-        
+
     </div>
 </div>
 {% endblock %}

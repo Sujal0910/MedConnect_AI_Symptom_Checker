@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<!-- Light mode theme -->
+<html lang="en" class="h-full bg-brand-cream"> 
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    // "Cozy Rustic Neutrals" palette
+                    colors: {
+                        'brand-cream': '#fefae0',   // Main background
+                        'brand-golden': '#dda15e',  // Secondary accent
+                        'brand-olive': '#606c38',   // Body text
+                        'brand-forest': '#283618',  // Navbar bg & Headings
+                    },
+                    // Add animations for fade-in effects
+                    animation: {
+                        'fade-in-up': 'fadeInUp 0.8s ease-out forwards',
+                    },
+                    keyframes: {
+                        fadeInUp: {
+                            '0%': { opacity: '0', transform: 'translateY(20px)' },
+                            '100%': { opacity: '1', transform: 'translateY(0)' },
+                        },
+                    }
+                }
+            },
+        }
+    </script>
+    
+    <!-- Three.js -->
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.164.1/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.164.1/examples/jsm/"
+            }
+        }
+    </script>
+
+    <title>{{ title }}</title>
+    
+    <style>
+        /* Ensure the 3D canvas fills its container */
+        #dna-canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+            opacity: 0; /* Start hidden */
+            animation: fadeInUp 1s ease-out 0.5s forwards; /* Fade in after text */
+            animation-delay: 0.5s;
+        }
+        
+        /* Custom animation delay for staggered text */
+        .animate-fade-in-up {
+            opacity: 0;
+        }
+        .delay-100 { animation-delay: 0.1s; }
+        .delay-200 { animation-delay: 0.2s; }
+        .delay-300 { animation-delay: 0.3s; }
+        .delay-400 { animation-delay: 0.4s; }
+        .delay-500 { animation-delay: 0.5s; }
+
+    </style>
+</head>
+<body class="h-full flex flex-col font-sans text-brand-olive antialiased">
+
+    <!-- 
+      Navbar 
+      bg-brand-forest (#283618) with text-brand-cream (#fefae0)
+    -->
+    <header class="bg-brand-forest shadow-lg w-full z-20">
+        <nav class="container mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <!-- Logo -->
+                <div class="flex-shrink-0 flex items-center">
+                    <svg class="h-8 w-8 text-brand-golden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12Z" />
+                    </svg>
+                    <!-- App Name Updated -->
+                    <span class="text-brand-cream text-xl font-semibold ml-2">Medullose</span>
+                </div>
+                
+                <!-- Login/Signup Buttons (Right) -->
+                <div class="flex items-center space-x-2">
+                    <button id="show-login-btn" class="text-brand-cream hover:bg-brand-olive hover:bg-opacity-20 px-3 py-2 rounded-md text-sm font-medium">Log In</button>
+                    <!-- Blue button as requested -->
+                    <button id="show-signup-btn" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium">Sign Up</button>
+                </div>
+            </div>
+        </nav>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="flex-1 overflow-y-auto bg-brand-cream relative">
+        
+        <!-- Grid Layout -->
+        <div class="container mx-auto grid grid-cols-1 md:grid-cols-2 gap-8 items-center min-h-[calc(100vh-64px)] px-6 py-12">
+
+            <!-- Left Side: Hero Text -->
+            <div class="z-10">
+                <h1 class="text-5xl md:text-6xl font-bold text-brand-forest mb-4 animate-fade-in-up delay-100">
+                    Your Health,
+                    <br>
+                    <span class="text-brand-golden">Understood.</span>
+                </h1>
+                <p class="text-lg text-brand-olive mb-8 max-w-lg animate-fade-in-up delay-300">
+                    Medullose isn't just a symptom checker. We provide a complete, trusted path from your first question to a confirmed doctor's appointment. All in one place.
+                </p>
+                <div class="flex space-x-4 animate-fade-in-up delay-500">
+                    <!-- Blue button as requested -->
+                    <button id="cta-signup-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg shadow-md transition duration-200">
+                        Get Started
+                    </button>
+                    <button id="cta-login-btn" class="bg-white hover:bg-gray-50 text-brand-forest font-bold py-3 px-6 rounded-lg shadow-md border border-brand-stone transition duration-200">
+                        Log In
+                    </button>
+                </div>
+            </div>
+
+            <!-- Right Side: 3D Visual -->
+            <div class="w-full h-64 md:h-full min-h-[400px] z-0">
+                <canvas id="dna-canvas"></canvas>
+            </div>
+        </div>
+
+        <!-- 
+          Login/Signup Modal (Overlay) 
+          This is hidden by default and shown with JavaScript
+        -->
+        <div id="auth-modal" class="hidden fixed inset-0 bg-brand-forest bg-opacity-75 flex items-center justify-center z-50 p-4 transition-opacity duration-300">
+            
+            <!-- 
+              Modal Content
+              THIS IS THE FIX:
+              - Changed bg-white to bg-brand-cream
+              - Added border-brand-stone
+            -->
+            <div id="auth-card" class="bg-brand-cream w-full max-w-md p-8 rounded-lg shadow-2xl relative border border-brand-stone">
+                <!-- Close Button -->
+                <button id="close-modal-btn" class="absolute top-4 right-4 text-brand-stone hover:text-brand-forest">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+
+                <!-- Flash Messages -->
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        <div class="mb-4">
+                            {% for category, message in messages %}
+                                <div class="p-3 rounded-md
+                                    {% if category == 'success' %} bg-green-100 border border-green-200 text-green-800
+                                    {% elif category == 'danger' %} bg-red-100 border border-red-200 text-red-800
+                                    {% else %} bg-blue-100 border border-blue-200 text-blue-800
+                                    {% endif %}">
+                                    {{ message }}
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                {% endwith %}
+
+                <!-- Login Form (Visible by default in modal) -->
+                <div id="login-form">
+                    <h2 class="text-2xl font-bold text-brand-forest mb-6 text-center">Welcome Back</h2>
+                    <form method="POST" action="{{ url_for('login') }}" class="space-y-4">
+                        <div>
+                            <label for="login-email" class="block text-sm font-medium text-brand-olive">Email</label>
+                            <!-- FIX: Input bg-brand-cream, border-brand-stone -->
+                            <input type="email" id="login-email" name="email" class="mt-1 block w-full bg-brand-cream border border-brand-stone rounded-lg p-3 text-brand-forest focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+                        </div>
+                        <div>
+                            <label for="login-password" class="block text-sm font-medium text-brand-olive">Password</label>
+                            <input type="password" id="login-password" name="password" class="mt-1 block w-full bg-brand-cream border border-brand-stone rounded-lg p-3 text-brand-forest focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+                        </div>
+                        <!-- Blue button as requested -->
+                        <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg shadow-md transition duration-200">
+                            Log In
+                        </button>
+                    </form>
+                    <p class="text-sm text-center text-brand-olive mt-4">
+                        Don't have an account? 
+                        <!-- Blue link -->
+                        <button id="toggle-to-signup" class="font-medium text-blue-600 hover:underline">Sign up</button>
+                    </p>
+                </div>
+
+                <!-- Signup Form (Hidden by default) -->
+                <div id="signup-form" class="hidden">
+                    <h2 class="text-2xl font-bold text-brand-forest mb-6 text-center">Create Your Account</h2>
+                    <form method="POST" action="{{ url_for('signup') }}" class="space-y-4">
+                        <div>
+                            <label for="signup-name" class="block text-sm font-medium text-brand-olive">Name</label>
+                            <input type="text" id="signup-name" name="name" class="mt-1 block w-full bg-brand-cream border border-brand-stone rounded-lg p-3 text-brand-forest focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+                        </div>
+                        <div>
+                            <label for="signup-email" class="block text-sm font-medium text-brand-olive">Email</label>
+                            <input type="email" id="signup-email" name="email" class="mt-1 block w-full bg-brand-cream border border-brand-stone rounded-lg p-3 text-brand-forest focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+                        </div>
+                        <div>
+                            <label for="signup-password" class="block text-sm font-medium text-brand-olive">Password</label>
+                            <input type="password" id="signup-password" name="password" class="mt-1 block w-full bg-brand-cream border border-brand-stone rounded-lg p-3 text-brand-forest focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+                        </div>
+                        <!-- Blue button as requested -->
+                        <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg shadow-md transition duration-200">
+                            Create Account
+                        </button>
+                    </form>
+                    <p class="text-sm text-center text-brand-olive mt-4">
+                        Already have an account? 
+                        <!-- Blue link -->
+                        <button id="toggle-to-login" class="font-medium text-blue-600 hover:underline">Log in</button>
+                    </p>
+                </div>
+
+            </div>
+        </div>
+
+    </main>
+
+    <!-- 
+      JavaScript for Modal Toggling
+    -->
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const authModal = document.getElementById('auth-modal');
+            const authCard = document.getElementById('auth-card');
+            const closeModalBtn = document.getElementById('close-modal-btn');
+            
+            const loginForm = document.getElementById('login-form');
+            const signupForm = document.getElementById('signup-form');
+            
+            const showLoginButtons = [
+                document.getElementById('show-login-btn'),
+                document.getElementById('cta-login-btn'),
+                document.getElementById('toggle-to-login')
+            ];
+            const showSignupButtons = [
+                document.getElementById('show-signup-btn'),
+                document.getElementById('cta-signup-btn'),
+                document.getElementById('toggle-to-signup')
+            ];
+
+            function showModal() {
+                authModal.classList.remove('hidden');
+                authModal.classList.add('flex');
+            }
+
+            function hideModal() {
+                authModal.classList.add('hidden');
+                authModal.classList.remove('flex');
+            }
+
+            function showLogin() {
+                loginForm.classList.remove('hidden');
+                signupForm.classList.add('hidden');
+                showModal();
+            }
+
+            function showSignup() {
+                loginForm.classList.add('hidden');
+                signupForm.classList.remove('hidden');
+                showModal();
+            }
+
+            showLoginButtons.forEach(btn => btn.addEventListener('click', showLogin));
+            showSignupButtons.forEach(btn => btn.addEventListener('click', showSignup));
+            
+            // Close modal when clicking close button or outside the card
+            closeModalBtn.addEventListener('click', hideModal);
+            authModal.addEventListener('click', (e) => {
+                if (e.target === authModal) {
+                    hideModal();
+                }
+            });
+
+            // Check URL parameters to show correct form (from app.py redirects)
+            const params = new URLSearchParams(window.location.search);
+            if (params.get('form') === 'signup') {
+                showSignup();
+            } else if (params.get('form') === 'login') {
+                showLogin();
+            }
+        });
+    </script>
+
+    <!-- 
+      JavaScript for 3D DNA Visual 
+    -->
+    <script type="module">
+        import * as THREE from 'three';
+
+        // Get the canvas element
+        const canvas = document.getElementById('dna-canvas');
+        if (canvas) {
+            let scene, camera, renderer, helix;
+            let mouseX = 0, mouseY = 0;
+            let windowHalfX = window.innerWidth / 2;
+            let windowHalfY = window.innerHeight / 2;
+
+            function init() {
+                scene = new THREE.Scene();
+                
+                camera = new THREE.PerspectiveCamera(75, canvas.clientWidth / canvas.clientHeight, 0.1, 1000);
+                camera.position.z = 10;
+                
+                renderer = new THREE.WebGLRenderer({ canvas: canvas, alpha: true, antialias: true });
+                renderer.setSize(canvas.clientWidth, canvas.clientHeight);
+                renderer.setPixelRatio(window.devicePixelRatio);
+
+                // Create the Helix
+                helix = createHelix();
+                scene.add(helix);
+
+                const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+                scene.add(ambientLight);
+                
+                const pointLight = new THREE.PointLight(0xffffff, 1);
+                pointLight.position.set(10, 10, 10);
+                scene.add(pointLight);
+
+                document.addEventListener('mousemove', onDocumentMouseMove);
+                window.addEventListener('resize', onWindowResize);
+                onWindowResize(); 
+            }
+
+            function createHelix() {
+                const group = new THREE.Group();
+                const geometry = new THREE.SphereGeometry(0.2, 16, 16);
+                
+                // Use your palette colors!
+                const material1 = new THREE.MeshPhongMaterial({ color: '#606c38' }); // Olive
+                const material2 = new THREE.MeshPhongMaterial({ color: '#dda15e' }); // Golden
+                
+                const steps = 50;
+                const radius = 3;
+                const heightStep = 0.2;
+
+                for (let i = 0; i < steps; i++) {
+                    let y = -steps * heightStep / 2 + i * heightStep;
+                    let angle = y * 0.5;
+
+                    // First strand
+                    const sphere1 = new THREE.Mesh(geometry, material1);
+                    sphere1.position.x = radius * Math.cos(angle);
+                    sphere1.position.y = y;
+                    sphere1.position.z = radius * Math.sin(angle);
+                    group.add(sphere1);
+
+                    // Second strand
+                    const sphere2 = new THREE.Mesh(geometry, material2);
+                    sphere2.position.x = radius * Math.cos(angle + Math.PI);
+                    sphere2.position.y = y;
+                    sphere2.position.z = radius * Math.sin(angle + Math.PI);
+                    group.add(sphere2);
+                    
+                    // Connectors (rungs)
+                    if (i % 4 === 0) {
+                        const barGeo = new THREE.CylinderGeometry(0.05, 0.05, radius * 2);
+                        const barMat = new THREE.MeshPhongMaterial({ color: '#bcb8b1' }); // Stone
+                        const bar = new THREE.Mesh(barGeo, barMat);
+                        bar.position.y = y;
+                        bar.rotation.z = Math.PI / 2;
+                        bar.lookAt(sphere1.position);
+                        group.add(bar);
+                    }
+                }
+                return group;
+            }
+
+            function onWindowResize() {
+                const container = canvas.parentElement;
+                const width = container.clientWidth;
+                const height = container.clientHeight;
+
+                if (width > 0 && height > 0) {
+                    camera.aspect = width / height;
+                    camera.updateProjectionMatrix();
+                    renderer.setSize(width, height);
+                    
+                    windowHalfX = window.innerWidth / 2;
+                    windowHalfY = window.innerHeight / 2;
+                }
+            }
+
+            function onDocumentMouseMove(event) {
+                mouseX = (event.clientX - windowHalfX) / 100;
+                mouseY = (event.clientY - windowHalfY) / 100;
+            }
+
+            function animate() {
+                requestAnimationFrame(animate);
+
+                if (helix) {
+                    helix.rotation.y += 0.005;
+                }
+                
+                camera.position.x += (mouseX - camera.position.x) * 0.05;
+                camera.position.y += (-mouseY - camera.position.y) * 0.05;
+                camera.lookAt(scene.position);
+
+                renderer.render(scene, camera);
+            }
+
+            init();
+            animate();
+        }
+    </script>
+</body>
+</html>

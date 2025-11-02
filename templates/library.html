@@ -1,26 +1,35 @@
 {% extends "base.html" %}
 
-{% block title %}Article Library - MedConnect AI{% endblock %}
+{% block title %}{{ title }}{% endblock %}
 
 {% block content %}
-<div class="bg-gray-800 p-6 rounded-lg shadow-xl">
-    <h1 class="text-3xl font-bold text-white mb-6">Verified Health Library</h1>
-    <p class="text-lg text-gray-300 mb-8">
-        Safe, simple, and verified health information to help you make informed decisions.
-        This content is for informational purposes only and is not a substitute for professional medical advice.
-    </p>
+<!-- NEW: Light-mode container -->
+<div class="container mx-auto max-w-5xl p-4 md:p-8 lg:p-12">
+    
+    <!-- NEW: Headings re-skinned -->
+    <h1 class="text-3xl font-bold text-brand-forest mb-2">Verified Health Library</h1>
+    <p class="text-lg text-brand-olive mb-8">Safe, simple, and verified health information to help you make informed decisions.</p>
 
+    <!-- Article Grid -->
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        
+        <!-- 
+          NEW: Article Cards
+          - bg-white
+          - shadow-lg
+          - border-brand-stone (lightly visible)
+        -->
         {% for article in articles %}
-            <a href="{{ url_for('article_detail', article_id=article.id) }}" class="block p-6 bg-gray-700 rounded-lg shadow-md hover:bg-gray-600 transition duration-300 ease-in-out transform hover:-translate-y-1">
-                <span class="inline-block bg-blue-500 text-white text-xs font-semibold px-2.5 py-0.5 rounded-full mb-2">{{ article.category }}</span>
-                <h2 class="text-xl font-semibold text-white mb-2">{{ article.title }}</h2>
-                <p class="text-gray-300 text-sm">Click to read more...</p>
-            </a>
-        {% else %}
-            <p class="text-gray-400">No articles found in the library.</p>
+        <a href="{{ url_for('article_detail', article_id=article.id) }}" class="block bg-white p-6 rounded-lg shadow-lg border border-brand-stone border-opacity-20 hover:shadow-xl transition-shadow duration-300">
+            <!-- NEW: Golden accent-colored category tag -->
+            <span class="inline-block bg-brand-golden bg-opacity-10 text-brand-golden text-xs font-semibold px-3 py-1 rounded-full mb-3">{{ article.category }}</span>
+            <!-- NEW: Forest heading -->
+            <h3 class="text-xl font-semibold text-brand-forest mb-2">{{ article.title }}</h3>
+            <!-- NEW: Olive text -->
+            <p class="text-brand-olive text-sm">Click to read more...</p>
+        </a>
         {% endfor %}
+
     </div>
 </div>
 {% endblock %}
-

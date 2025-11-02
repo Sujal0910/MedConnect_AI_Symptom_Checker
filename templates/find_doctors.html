@@ -3,36 +3,48 @@
 {% block title %}{{ title }}{% endblock %}
 
 {% block content %}
+<!-- NEW: Light-mode container -->
 <div class="container mx-auto max-w-5xl p-4 md:p-8 lg:p-12">
-    <h1 class="text-3xl font-bold text-white mb-6">Find a Doctor</h1>
+    <!-- NEW: Re-skinned heading -->
+    <h1 class="text-3xl font-bold text-brand-forest mb-6">Find a Doctor</h1>
 
     <!-- 
       MAP CONTAINER
-      This div will be targeted by the Leaflet.js script.
-      The size is set in base.html's <style> tag.
+      This div is styled by #map in base.html
     -->
-    <div id="map" class="shadow-lg mb-8"></div>
+    <div id="map" class="shadow-lg mb-8 border border-brand-stone border-opacity-20"></div>
 
     <!-- Doctor List -->
-    <h2 class="text-2xl font-semibold text-white mb-6">Nearby Clinics & Hospitals</h2>
+    <h2 class="text-2xl font-semibold text-brand-forest mb-6">Nearby Clinics & Hospitals</h2>
     <div id="doctor-list" class="grid grid-cols-1 md:grid-cols-2 gap-6">
         <!-- Doctor cards will be dynamically injected here by the script -->
-        <p id="loading-doctors" class="text-gray-400">Loading doctors...</p>
+        <p id="loading-doctors" class="text-brand-olive">Loading doctors...</p>
     </div>
 </div>
 
 <script>
     document.addEventListener('DOMContentLoaded', function () {
         
-        // 1. Initialize the Map (centered on your region)
-        // Coordinates for Unnao/Lucknow area
-        const map = L.map('map').setView([26.7, 80.7], 10); 
+        // 1. Initialize the Map
+        const map = L.map('map').setView([26.7, 80.7], 10); // Centered on Lucknow/Unnao
 
         // Add the OpenStreetMap "tile layer" (the map image)
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             maxZoom: 19,
             attribution: '© <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
         }).addTo(map);
+
+        // --- NEW: Custom Map Pin Icon (Blue) ---
+        // Using a high-visibility blue as requested
+        const customIcon = L.divIcon({
+            html: `<svg class="w-8 h-8 text-blue-600" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                       <path fill-rule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clip-rule="evenodd"></path>
+                   </svg>`,
+            className: 'bg-transparent border-0',
+            iconSize: [32, 32],
+            iconAnchor: [16, 32] // Point of the icon
+        });
+        // --- End of Custom Icon ---
 
         const doctorListEl = document.getElementById('doctor-list');
         const loadingDoctorsEl = document.getElementById('loading-doctors');
@@ -57,25 +69,27 @@
                     return;
                 }
 
-                // Clear "loading..." message
                 doctorListEl.innerHTML = ''; 
 
                 doctors.forEach(doctor => {
-                    // Add a pin to the map
-                    L.marker([doctor.lat, doctor.lng]).addTo(map)
+                    // Add a pin to the map (using our new custom icon)
+                    L.marker([doctor.lat, doctor.lng], { icon: customIcon }).addTo(map)
                         .bindPopup(`<b>${doctor.name}</b><br>${doctor.specialty}`);
 
                     // Create the HTML "Doctor Card"
+                    // --- NEW: Re-skinned white card ---
                     const card = document.createElement('div');
-                    card.className = 'bg-gray-800 p-6 rounded-lg shadow-lg flex flex-col justify-between';
+                    card.className = 'bg-white p-6 rounded-lg shadow-lg border border-brand-stone border-opacity-20 flex flex-col justify-between';
                     
                     card.innerHTML = `
                         <div>
-                            <h3 class="text-xl font-semibold text-white mb-2">${doctor.name}</h3>
-                            <p class="text-blue-400 mb-3">${doctor.specialty}</p>
-                            <p class="text-gray-300 text-sm mb-2">${doctor.address}</p>
-                            <p class="text-gray-400 text-sm mb-4">${doctor.phone}</p>
+                            <h3 class="text-xl font-semibold text-brand-forest mb-2">${doctor.name}</h3>
+                            <!-- NEW: Golden accent for specialty -->
+                            <p class="text-brand-golden font-medium mb-3">${doctor.specialty}</p>
+                            <p class="text-brand-olive text-sm mb-2">${doctor.address}</p>
+                            <p class="text-brand-olive text-sm mb-4">${doctor.phone}</p>
                         </div>
+                        <!-- NEW: Blue button (as requested) -->
                         <a href="/book/${doctor.id}" class="mt-4 w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg shadow-md transition duration-200 ease-in-out text-center">
                             Book Appointment
                         </a>
@@ -95,4 +109,3 @@
     });
 </script>
 {% endblock %}
-

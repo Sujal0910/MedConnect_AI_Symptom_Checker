@@ -1,28 +1,32 @@
 {% extends "base.html" %}
 
-{% block title %}Chat - MedConnect AI{% endblock %}
+{% block title %}{{ title }}{% endblock %}
 
 {% block content %}
+<!-- NEW: Light-mode container -->
 <div class="flex-1 flex flex-col h-full p-4 md:p-8 lg:p-12" style="height: calc(100vh - 64px);">
     
     <!-- Chat Window -->
-    <div id="chat-window" class="flex-1 bg-gray-800 rounded-lg shadow-inner overflow-y-auto p-6 space-y-4 mb-4">
-        <!-- Messages will be dynamically added here -->
+    <!-- NEW: Re-skinned for light-mode. bg-white, shadow-lg, border-brand-stone -->
+    <div id="chat-window" class="flex-1 bg-white rounded-lg shadow-lg overflow-y-auto p-6 space-y-4 mb-4 border border-brand-stone border-opacity-20">
+        <!-- 
+          Chat messages will be dynamically injected here.
+          The 'Welcome' message will be added by the loadHistory() script.
+        -->
     </div>
 
     <!-- Loading Indicator -->
-    <div id="loading-indicator" class="hidden flex items-center justify-center mb-2">
-        <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-blue-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-          </svg>
-        <span class="text-gray-400">MedConnect AI is thinking...</span>
+    <div id="loading-indicator" class="hidden flex items-center justify-center mb-2 space-x-2">
+        <!-- NEW: Re-skinned for light-mode -->
+        <span class="text-sm text-brand-olive">Medullose is thinking...</span>
+        <div class="h-2 w-2 bg-brand-olive rounded-full animate-bounce" style="animation-delay: -0.3s;"></div>
+        <div class="h-2 w-2 bg-brand-olive rounded-full animate-bounce" style="animation-delay: -0.15s;"></div>
+        <div class="h-2 w-2 bg-brand-olive rounded-full animate-bounce"></div>
     </div>
 
     <!-- 
       Input Form 
-      We pass the Flask URLs to the script via data- attributes
-      This is the most robust way to do it.
+      NEW: Re-skinned for light-mode.
     -->
     <form id="chat-form" 
           class="flex items-center space-x-3"
@@ -30,7 +34,11 @@
           data-history-url="{{ url_for('get_history') }}"
           data-clear-url="{{ url_for('clear_chat') }}"
           data-user-name="{{ current_user.name }}">
-        <input type="text" id="message-input" placeholder="Type your symptoms here..." autocomplete="off" class="flex-1 p-3 bg-gray-700 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-white" autofocus>
+        
+        <!-- NEW: bg-white, border-brand-stone, text-brand-forest -->
+        <input type="text" id="message-input" placeholder="Type your symptoms here..." autocomplete="off" class="flex-1 p-3 bg-white border border-brand-stone rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-brand-forest" autofocus>
+        
+        <!-- NEW: Blue button (as requested) -->
         <button type="submit" id="send-button" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg shadow-md transition duration-200 ease-in-out">
             Send
         </button>
@@ -38,11 +46,12 @@
 </div>
 
 <!-- Custom Modal for Errors -->
-<div id="error-modal" class="hidden fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 p-4">
-    <div class="bg-gray-800 rounded-lg shadow-2xl max-w-sm w-full p-6 border border-red-500">
-        <h3 class="text-xl font-semibold text-red-400 mb-4">An Error Occurred</h3>
-        <p id="error-message" class="text-gray-300 mb-6">Something went wrong. Please try again.</p>
-        <button id="close-modal-btn" class="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-lg transition duration-200 ease-in-out">
+<!-- NEW: Re-skinned for light-mode -->
+<div id="error-modal" class="hidden fixed inset-0 bg-brand-forest bg-opacity-75 flex items-center justify-center z-50 p-4">
+    <div class="bg-white p-6 rounded-lg shadow-2xl max-w-sm w-full">
+        <h3 class="text-xl font-bold text-red-600 mb-4">An Error Occurred</h3>
+        <p id="error-message-text" class="text-brand-olive mb-6">Something went wrong.</p>
+        <button id="close-modal-btn" class="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-lg">
             Close
         </button>
     </div>
@@ -55,12 +64,14 @@
     const messageInput = document.getElementById('message-input');
     const sendButton = document.getElementById('send-button');
     const loadingIndicator = document.getElementById('loading-indicator');
+    const clearChatBtn = document.getElementById('clear-chat-btn');
+
+    // Modal elements
     const errorModal = document.getElementById('error-modal');
-    const errorMessage = document.getElementById('error-message');
+    const errorMessageText = document.getElementById('error-message-text');
     const closeModalBtn = document.getElementById('close-modal-btn');
 
     // --- State & URLs ---
-    // Read URLs safely from the data attributes
     const ASK_URL = chatForm.dataset.askUrl;
     const HISTORY_URL = chatForm.dataset.historyUrl;
     const CLEAR_URL = chatForm.dataset.clearUrl;
@@ -75,26 +86,26 @@
      * @param {string} text - The message text
      */
     function addMessageToChat(sender, text) {
-        // Create the outer div that aligns the message
         const messageDiv = document.createElement('div');
-        messageDiv.classList.add('flex', 'w-full');
+        messageDiv.className = 'flex w-full';
 
-        // Create the message bubble
         const bubble = document.createElement('div');
-        bubble.classList.add('rounded-lg', 'px-4', 'py-3', 'shadow-md', 'max-w-xl');
+        // NEW: Added overflow-x-auto to fix table/code block overflow
+        bubble.className = 'max-w-xl p-3 rounded-lg shadow-md overflow-x-auto';
 
         if (sender === 'user') {
-            // User: align right
+            // --- NEW: User bubble styling (Blue) ---
             messageDiv.classList.add('justify-end');
             bubble.classList.add('bg-blue-600', 'text-white');
             bubble.textContent = text;
         } else {
-            // Assistant: align left
+            // --- NEW: Assistant bubble styling (Light Gray) ---
             messageDiv.classList.add('justify-start');
-            bubble.classList.add('bg-gray-700', 'text-white', 'prose', 'prose-invert', 'max-w-2xl', 'overflow-x-auto');
-            // This is the fix: use Marked.js to parse Markdown to HTML
-            // and apply prose for styling and overflow-x-auto for tables.
+            bubble.classList.add('bg-gray-100', 'text-brand-forest');
+            
+            // Use Marked.js to render Markdown, and add prose styles
             bubble.innerHTML = marked.parse(text);
+            bubble.classList.add('prose', 'prose-custom'); 
         }
 
         messageDiv.appendChild(bubble);
@@ -117,12 +128,11 @@
         if (isLoading) {
             loadingIndicator.classList.remove('hidden');
             sendButton.disabled = true;
-            messageInput.disabled = true;
+            sendButton.classList.add('opacity-50', 'cursor-not-allowed');
         } else {
             loadingIndicator.classList.add('hidden');
             sendButton.disabled = false;
-            messageInput.disabled = false;
-            messageInput.focus();
+            sendButton.classList.remove('opacity-50', 'cursor-not-allowed');
         }
     }
 
@@ -131,7 +141,7 @@
      * @param {string} message - The error message to display
      */
     function showCustomError(message) {
-        errorMessage.textContent = message;
+        errorMessageText.textContent = message;
         errorModal.classList.remove('hidden');
     }
 
@@ -141,7 +151,7 @@
      * Handles the chat form submission.
      */
     async function handleChatSubmit(e) {
-        e.preventDefault(); // Stop the form from reloading the page
+        e.preventDefault(); // Stop page reload
         const message = messageInput.value.trim();
         if (!message) return;
 
@@ -152,24 +162,26 @@
         try {
             const response = await fetch(ASK_URL, {
                 method: 'POST',
-                // This 'credentials' line is CRITICAL for Flask-Login
-                credentials: 'same-origin', 
+                credentials: 'same-origin', // Send cookies
                 headers: {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({ message: message }),
             });
 
-            if (!response.ok) {
-                const errorText = await response.text();
-                throw new Error(errorText);
-            }
-
-            // Check if the server sent JSON or (incorrectly) HTML
+            // Check for non-JSON responses (like a login redirect)
             const contentType = response.headers.get("content-type");
             if (!contentType || !contentType.includes("application/json")) {
-                // This means the session is invalid, and we got the login page.
-                throw new Error("Your session has expired. Please log out and log back in.");
+                if(response.status === 500) {
+                     throw new Error("The server encountered an internal error. Please try again.");
+                } else {
+                     throw new Error("Your session has expired. Please log out and log back in.");
+                }
+            }
+            
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'An unknown error occurred.');
             }
 
             const data = await response.json();
@@ -191,32 +203,34 @@
         try {
             const response = await fetch(HISTORY_URL, {
                 method: 'GET',
-                credentials: 'same-origin' 
+                credentials: 'same-origin' // Send cookies
             });
             
-            if (!response.ok) {
-                const errorText = await response.text();
-                throw new Error(errorText);
-            }
-            
-            // Check if the server sent JSON or (incorrectly) HTML
+            // Check for non-JSON responses
             const contentType = response.headers.get("content-type");
             if (!contentType || !contentType.includes("application/json")) {
                 throw new Error("Your session has expired. Please log out and log back in.");
+            }
+            
+            if (!response.ok) {
+                 const errorData = await response.json();
+                throw new Error(errorData.error || 'Failed to load history.');
             }
 
             const history = await response.json();
             
             if (history.length > 0) {
-                history.forEach(msg => addMessageToChat(msg.role, msg.content));
+                history.forEach(msg => {
+                    addMessageToChat(msg.role, msg.content);
+                });
             } else {
                 // Show welcome message if history is empty
-                addMessageToChat('assistant', `Welcome, ${currentUserName}! I'm MedConnect AI. How can I help you today? \n\nI am an AI, not a doctor. Please consult a medical professional for any serious health concerns.`);
+                addMessageToChat('assistant', `Welcome, ${currentUserName}! I'm Medullose. How can I help you today? \n\nI am an AI, not a doctor. Please consult a medical professional for any serious health concerns.`);
             }
 
         } catch (error) {
             console.error('Error loading history:', error);
-            showCustomError(error.message || 'Could not load chat history. Please refresh the page.');
+            showCustomError(error.message);
         } finally {
             setLoading(false);
             scrollToBottom();
@@ -229,35 +243,31 @@
     async function handleClearChat(e) {
         e.preventDefault();
         
-        // This is a stub for a custom, non-blocking confirm modal
-        // In a real app, you'd build a beautiful modal here.
-        if (!window.confirm("Are you sure you want to clear your chat history? This cannot be undone.")) {
+        // Use a simple, non-blocking confirm
+        if (!window.confirm("Are you sure you want to clear your entire chat history?")) {
             return;
         }
-        
-        console.log("Attempting to clear chat...");
         
         try {
             const response = await fetch(CLEAR_URL, {
                 method: 'POST',
-                credentials: 'same-origin' 
+                credentials: 'same-origin' // Send cookies
             });
 
-            if (!response.ok) {
-                const errorText = await response.text();
-                throw new Error(errorText);
-            }
-            
-            // Check if the server sent JSON or (incorrectly) HTML
             const contentType = response.headers.get("content-type");
             if (!contentType || !contentType.includes("application/json")) {
                 throw new Error("Your session has expired. Please log out and log back in.");
             }
+            
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Failed to clear chat.');
+            }
 
             // Clear chat window
             chatWindow.innerHTML = '';
-            // Show welcome message again
-            addMessageToChat('assistant', `Welcome, ${currentUserName}! I'm MedConnect AI. How can I help you today? \n\nI am an AI, not a doctor. Please consult a medical professional for any serious health concerns.`);
+            // Show new welcome message
+            addMessageToChat('assistant', `Welcome, ${currentUserName}! I'm Medullose. How can I help you today? \n\nI am an AI, not a doctor. Please consult a medical professional for any serious health concerns.`);
 
         } catch (error) {
             console.error('Error clearing chat:', error);
@@ -268,12 +278,11 @@
     // --- Attach Event Listeners ---
     chatForm.addEventListener('submit', handleChatSubmit);
     
-    // Attach listener to the "Clear Chat" button in the navbar
-    const clearChatBtn = document.getElementById('clear-chat-btn');
-    if (clearChatBtn) {
+    // Check if clearChatBtn exists (it's in base.html)
+    if(clearChatBtn) {
         clearChatBtn.addEventListener('click', handleClearChat);
     }
-
+    
     closeModalBtn.addEventListener('click', () => {
         errorModal.classList.add('hidden');
     });
@@ -283,4 +292,3 @@
 
 </script>
 {% endblock %}
-

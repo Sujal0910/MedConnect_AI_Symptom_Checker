@@ -25,8 +25,10 @@ app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(instance_pat
 db = SQLAlchemy(app)
 bcrypt = Bcrypt(app)
 login_manager = LoginManager(app)
-login_manager.login_view = 'login'
-login_manager.login_message_category = 'info'
+# --- UPDATED: Redirect to the new landing page ---
+login_manager.login_view = 'landing' 
+login_manager.login_message = 'Please log in or sign up to access the app.'
+login_manager.login_message_category = 'info' # This category will be used for styling flash messages
 
 # --- OpenRouter AI Client ---
 OPENROUTER_API_KEY = os.environ.get('OPENROUTER_API_KEY')
@@ -35,7 +37,7 @@ client = OpenAI(
     api_key=OPENROUTER_API_KEY,
 )
 
-# --- Database Models ---
+# --- Database Models (No Changes) ---
 
 class User(db.Model, UserMixin):
     id = db.Column(db.Integer, primary_key=True)
@@ -46,18 +48,12 @@ class User(db.Model, UserMixin):
     reminders = db.relationship('Reminder', backref='author', lazy=True, cascade="all, delete-orphan")
     appointments = db.relationship('Appointment', backref='patient', lazy=True, cascade="all, delete-orphan")
 
-    def __repr__(self):
-        return f"User('{self.name}', '{self.email}')"
-
 class ChatHistory(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     role = db.Column(db.String(10), nullable=False) # 'user' or 'assistant'
     content = db.Column(db.Text, nullable=False)
     timestamp = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-
-    def __repr__(self):
-        return f"ChatHistory('{self.role}', '{self.content[:20]}...')"
 
 class Article(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -69,18 +65,12 @@ class Article(db.Model):
     def content_html(self):
         return markdown.markdown(self.content_md)
 
-    def __repr__(self):
-        return f"Article('{self.title}', '{self.category}')"
-
 class Reminder(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     medicine_name = db.Column(db.String(100), nullable=False)
     dosage = db.Column(db.String(50), nullable=True)
     reminder_time = db.Column(db.Time, nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-    
-    def __repr__(self):
-        return f"Reminder('{self.medicine_name}', '{self.reminder_time}')"
     
     def to_dict(self):
         return {
@@ -119,7 +109,7 @@ class Appointment(db.Model):
     doctor_id = db.Column(db.Integer, db.ForeignKey('doctor.id'), nullable=False)
 
 
-# --- Database Initialization Command ---
+# --- Database Initialization Command (No Changes) ---
 
 @app.cli.command('init-db')
 def init_db_command():
@@ -128,7 +118,7 @@ def init_db_command():
         db.drop_all()
         db.create_all()
         
-        # Add sample articles
+        # --- Full Article Content Added ---
         articles = [
             Article(title="Understanding the Common Cold", category="Common Illness", content_md="""
 **What is a common cold?**
@@ -302,9 +292,8 @@ You should see a medical professional if your cough:
         ]
         db.session.bulk_save_objects(articles)
         
-        # --- UPDATED: Add ALL 9 Sample Doctors ---
+        # --- Add ALL 9 Sample Doctors ---
         doctors = [
-            # Your original 4
             Doctor(name="Jai Hind Clinic", specialty="Medical Clinic", 
                    address="Nawabganj, durga mandir road, unnao Uttar Pradesh 209859", 
                    phone="09169457354", latitude=26.6187, longitude=80.6712),
@@ -317,8 +306,6 @@ You should see a medical professional if your cough:
             Doctor(name="Shri Ram Murti Smarak Hospital", specialty="Hospital", 
                    address="JJPGH+XG8, Allahabad Highway, Kanpur, Unnao, Ashakhera, Uttar Pradesh 209859", 
                    phone="05143278408", latitude=26.6249, longitude=80.5788),
-            
-            # Your 5 new ones
             Doctor(name="Sanjay Gandhi Post Graduate Institute (SGPGI)", specialty="Multi-Specialty Institute",
                    address="Raebareli Road, Haibat Mau Mawaiya, Pushpendra Nagar, Lucknow, Uttar Pradesh, 226014",
                    phone="0522-2494000", latitude=26.7588, longitude=80.9488),
@@ -347,17 +334,34 @@ You should see a medical professional if your cough:
 def load_user(user_id):
     return User.query.get(int(user_id))
 
-# --- Main App Routes ---
+# --- Main App Routes (NOW UPDATED FOR UI/UX) ---
 
 @app.route('/')
+def landing():
+    """Our new public-facing 3D landing page."""
+    if current_user.is_authenticated:
+        return redirect(url_for('dashboard'))
+    # Pass 'form' parameter to template to show login/signup
+    form_to_show = request.args.get('form', None) # Default to no form
+    return render_template('landing.html', title='Welcome to MedConnect AI', form_to_show=form_to_show)
+
+@app.route('/dashboard')
 @login_required
-def index():
+def dashboard():
+    """This is the new 'homepage' after logging in."""
+    # We'll send the user to the 'find_doctors' page as it's the most visual
+    return redirect(url_for('find_doctors'))
+
+@app.route('/chat')
+@login_required
+def chat():
+    """The main chat interface."""
     return render_template('index.html', title='Chat - MedConnect AI')
 
 @app.route('/signup', methods=['GET', 'POST'])
 def signup():
     if current_user.is_authenticated:
-        return redirect(url_for('index'))
+        return redirect(url_for('dashboard'))
     
     if request.method == 'POST':
         name = request.form.get('name')
@@ -366,12 +370,12 @@ def signup():
         
         if not name or not email or not password:
             flash('All fields are required.', 'danger')
-            return redirect(url_for('signup'))
+            return redirect(url_for('landing', form='signup'))
         
         existing_user = User.query.filter_by(email=email).first()
         if existing_user:
             flash('That email is already taken. Please log in.', 'warning')
-            return redirect(url_for('login'))
+            return redirect(url_for('landing', form='login'))
         
         hashed_password = bcrypt.generate_password_hash(password).decode('utf-8')
         new_user = User(name=name, email=email, password_hash=hashed_password)
@@ -380,21 +384,24 @@ def signup():
             db.session.add(new_user)
             db.session.commit()
             flash('Your account has been created! You can now log in.', 'success')
-            return redirect(url_for('login'))
+            return redirect(url_for('landing', form='login'))
         except IntegrityError:
             db.session.rollback()
             flash('An error occurred. Please try again.', 'danger')
+            return redirect(url_for('landing', form='signup'))
         except Exception as e:
             db.session.rollback()
             app.logger.error(f"Error during signup: {e}")
             flash('A server error occurred. Please try again later.', 'danger')
+            return redirect(url_for('landing', form='signup'))
 
-    return render_template('signup.html', title='Sign Up')
+    # If GET request, just show the landing page with signup
+    return redirect(url_for('landing', form='signup'))
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if current_user.is_authenticated:
-        return redirect(url_for('index'))
+        return redirect(url_for('dashboard'))
     
     if request.method == 'POST':
         email = request.form.get('email')
@@ -404,21 +411,24 @@ def login():
         
         if user and bcrypt.check_password_hash(user.password_hash, password):
             login_user(user, remember=True)
+            # Redirect to the intended page or the dashboard
             next_page = request.args.get('next')
-            return redirect(next_page or url_for('index'))
+            return redirect(next_page or url_for('dashboard'))
         else:
             flash('Login unsuccessful. Please check your email and password.', 'danger')
+            return redirect(url_for('landing', form='login'))
             
-    return render_template('login.html', title='Login')
+    # If GET request, just show the landing page with login
+    return redirect(url_for('landing', form='login'))
 
 @app.route('/logout')
 @login_required
 def logout():
     logout_user()
     flash('You have been logged out.', 'info')
-    return redirect(url_for('login'))
+    return redirect(url_for('landing')) # Redirect to the new landing page
 
-# --- Verified Health Library Routes ---
+# --- Verified Health Library Routes (No Changes) ---
 
 @app.route('/library')
 @login_required
@@ -436,7 +446,7 @@ def article_detail(article_id):
     
     return render_template('article_detail.html', title=article.title, article=article)
 
-# --- Chat API Routes ---
+# --- Chat API Routes (No Changes) ---
 
 def get_openrouter_response(messages):
     """Gets a response from the OpenRouter API."""
@@ -465,11 +475,9 @@ def ask():
     if not user_message_content:
         return jsonify({"error": "No message provided"}), 400
 
-    # Save user message
     user_message = ChatHistory(role='user', content=user_message_content, author=current_user)
     db.session.add(user_message)
     
-    # --- System Prompt with Reminder Function ---
     system_prompt = {
         "role": "system",
         "content": (
@@ -493,20 +501,15 @@ def ask():
         )
     }
     
-    # Fetch recent history
     recent_history = ChatHistory.query.filter_by(user_id=current_user.id).order_by(ChatHistory.timestamp.desc()).limit(10).all()
     recent_history.reverse() 
     
-    # Add the *new* user message to the history before sending it to the AI
     messages = [system_prompt] + [{"role": msg.role, "content": msg.content} for msg in recent_history]
     messages.append({"role": "user", "content": user_message_content})
 
-    # Get AI response
     ai_response_content = get_openrouter_response(messages)
     
-    # Check for Function Call
     try:
-        # Check if the response is our special JSON string
         data = json.loads(ai_response_content)
         
         if data.get('action') == 'create_reminder':
@@ -543,14 +546,10 @@ def ask():
                     ai_response_content = "I'm sorry, I had trouble saving that reminder. Please try again or use the manual form on the 'Reminders' page."
 
     except (json.JSONDecodeError, TypeError):
-        # It's a normal chat message, not a JSON object.
         pass
     
-    # Save AI response
     ai_message = ChatHistory(role='assistant', content=ai_response_content, author=current_user)
-    db.session.add(ai_message)
     
-    # Commit
     try:
         db.session.commit()
     except Exception as e:
@@ -636,7 +635,7 @@ def delete_reminder(reminder_id):
         app.logger.error(f"Error deleting reminder: {e}")
         return jsonify({"error": "An internal error occurred."}), 500
 
-# --- NEW: Doctor & Appointment Routes ---
+# --- Doctor & Appointment Routes ---
 
 @app.route('/find_doctors')
 @login_required

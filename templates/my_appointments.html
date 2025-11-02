@@ -3,39 +3,41 @@
 {% block title %}{{ title }}{% endblock %}
 
 {% block content %}
+<!-- NEW: Light-mode container -->
 <div class="container mx-auto max-w-4xl p-4 md:p-8 lg:p-12">
-    <h1 class="text-3xl font.bold text-white mb-8">My Appointments</h1>
+    <!-- NEW: Re-skinned heading -->
+    <h1 class="text-3xl font-bold text-brand-forest mb-8">My Appointments</h1>
 
-    <div class="bg-gray-800 p-6 rounded-lg shadow-lg">
+    <!-- NEW: Re-skinned white card -->
+    <div class="bg-white p-6 rounded-lg shadow-lg border border-brand-stone border-opacity-20">
         
         {% if appointments %}
             <div class="space-y-6">
                 {% for appt in appointments %}
-                    <div class="p-4 bg-gray-700 rounded-lg flex flex-col sm:flex-row justify-between sm:items-center">
+                    <!-- NEW: Re-skinned appointment item -->
+                    <div class="bg-brand-cream p-4 rounded-lg flex flex-col sm:flex-row justify-between sm:items-center shadow-md">
                         <div>
-                            <h3 class="text-xl font-semibold text-white">Dr. {{ appt.doctor.name }}</h3>
-                            <p class="text-blue-400 mb-2">{{ appt.doctor.specialty }}</p>
+                            <!-- NEW: Re-skinned text -->
+                            <h3 class="text-xl font-semibold text-brand-forest">Dr. {{ appt.doctor.name }}</h3>
+                            <!-- NEW: Golden specialty text -->
+                            <p class="text-brand-golden font-medium mb-2">{{ appt.doctor.specialty }}</p>
                             
-                            <!-- Format the datetime object to be readable -->
-                            <p class="text-gray-300">
-                                <span class="font-semibold">Date:</span> {{ appt.appointment_datetime.strftime('%A, %B %d, %Y') }}
+                            <p class="text-brand-olive">
+                                <span class="font-semibold text-brand-forest">Date:</span> {{ appt.appointment_datetime.strftime('%A, %B %d, %Y') }}
                             </p>
-                            <p class="text-gray-300">
-                                <span class="font-semibold">Time:</span> {{ appt.appointment_datetime.strftime('%I:%M %p') }}
+                            <p class="text-brand-olive">
+                                <span class="font-semibold text-brand-forest">Time:</span> {{ appt.appointment_datetime.strftime('%I:%M %p') }}
                             </p>
                             {% if appt.reason %}
-                                <p class="text-gray-400 text-sm mt-2">
-                                    <span class="font-semibold">Reason:</span> {{ appt.reason }}
+                                <p class="text-brand-olive text-sm mt-2">
+                                    <span class="font-semibold text-brand-forest">Reason:</span> {{ appt.reason }}
                                 </p>
                             {% endif %}
                         </div>
                         
                         <!-- Cancel Button Form -->
-                        <!-- 
-                          We use a form for the cancel button. This is a secure way to
-                          send a POST request to delete data.
-                        -->
                         <form method="POST" action="{{ url_for('cancel_appointment', appointment_id=appt.id) }}" class="mt-4 sm:mt-0">
+                            <!-- NEW: Red signal button (as requested) -->
                             <button type="submit" 
                                     class="w-full sm:w-auto bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-lg shadow-md transition duration-200 ease-in-out"
                                     onclick="return confirm('Are you sure you want to cancel this appointment?');">
@@ -47,7 +49,8 @@
             </div>
         {% else %}
             <!-- This shows if the user has no appointments -->
-            <p class="text-gray-400">You have no upcoming appointments.</p>
+            <p class="text-brand-olive">You have no upcoming appointments.</p>
+            <!-- NEW: Blue button (as requested) -->
             <a href="{{ url_for('find_doctors') }}" class="mt-4 inline-block bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg shadow-md transition duration-200 ease-in-out">
                 Find a Doctor
             </a>
