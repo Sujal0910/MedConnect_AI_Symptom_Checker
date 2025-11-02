@@ -33,7 +33,7 @@ login_manager.login_message_category = 'info'
 OPENROUTER_API_KEY = os.environ.get('OPENROUTER_API_KEY')
 client = OpenAI(
     base_url="https://openrouter.ai/api/v1",
-    api_key=OPENROUTER_API_KEY,
+    api_key=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,
 )
 
 # --- Database Models ---
