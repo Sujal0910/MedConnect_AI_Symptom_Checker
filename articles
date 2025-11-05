@@ -1,0 +1,178 @@
+def _init_db():
+    """Internal function to create tables and add data. This is what we will call from our secret route."""
+    db.drop_all()
+    db.create_all()
+    
+    # --- THIS IS THE FIX: Full Article Content Added ---
+    articles = [
+        Article(title="Understanding the Common Cold", category="Common Illness", content_md="""
+**What is a common cold?**
+The common cold is a viral infection of your nose and throat (upper respiratory tract). It's usually harmless, although it might not feel that way.
+
+**Symptoms**
+- Runny or stuffy nose
+- Sore throat
+- Cough
+- Congestion
+- Slight body aches or a mild headache
+- Sneezing
+- Low-grade fever
+
+**What to do**
+- **Rest:** Your body needs rest to heal.
+- **Hydration:** Drink plenty of fluids like water, juice, and clear broth to prevent dehydration.
+- **Symptom Relief:** Over-the-counter pain-relievers, decongestants, and cough syrups can help manage symptoms.
+
+**Disclaimer:** This is for informational purposes only. Always consult a medical professional for diagnosis and treatment.
+        """),
+        Article(title="First Aid for Minor Burns", category="First Aid", content_md="""
+**What is a minor burn?**
+A minor burn (first-degree or mild second-degree) is one that is small (less than 3 inches), superficial, and does not cover a major joint or sensitive area like the face.
+
+**Immediate Steps**
+1.  **Cool Water:** Immediately run cool (not cold) tap water over the burn for 10-15 minutes or until the pain subsides.
+2.  **Remove Jewelry:** Gently remove rings or other tight items from the burned area before it swells.
+3.  **Cover:** Loosely cover the burn with a sterile gauze bandage.
+4.  **Pain Relief:** Take an over-the-counter pain reliever like ibuprofen or acetaminophen if needed.
+
+**What NOT to do**
+- **Do NOT** use ice, as it can cause more skin damage.
+- **Do NOT** apply butter, oils, or toothpaste to the burn.
+- **Do NOT** break any blisters that form, as this can lead to infection.
+
+**Disclaimer:** Seek immediate medical attention for any burns that are large, deep, on the face/hands/feet/genitals, or caused by chemicals or electricity.
+        """),
+        Article(title="What is a Fever?", category="Symptoms", content_md="""
+**What is a fever?**
+A fever is a temporary increase in your body temperature, often due to an illness. A fever is a sign that something out of the ordinary is going on in your body. For an adult, a fever may be uncomfortable, but it usually isn't a cause for concern unless it reaches 103 F (39.4 C) or higher.
+
+**Common Causes**
+- Viral infections (like the flu or a cold)
+- Bacterial infections
+- Some inflammatory conditions
+- A reaction to a vaccine
+
+**What to do**
+- **Rest:** Get plenty of rest.
+- **Hydration:** Drink lots of fluids to stay hydrated.
+- **Medication:** Over-the-counter medications like acetaminophen or ibuprofen can help reduce a fever.
+
+**Disclaimer:** While most fevers are harmless, you should consult a doctor if your fever is unusually high, lasts for more than a few days, or is accompanied by severe symptoms like a stiff neck, confusion, or difficulty breathing.
+        """),
+        Article(title="The Importance of Handwashing", category="Wellness", content_md="""
+**Why is handwashing important?**
+Handwashing is one of the easiest and most effective ways to prevent the spread of germs and stay healthy. Your hands touch many surfaces and can pick up germs, which can then be transferred to your eyes, nose, or mouth.
+
+**When to Wash Your Hands**
+- Before, during, and after preparing food
+- Before eating
+- After using the toilet
+- After blowing your nose, coughing, or sneezing
+- After touching garbage
+- After touching an animal or animal waste
+
+**How to Wash Your Hands**
+1.  **Wet:** Wet your hands with clean, running water.
+2.  **Lather:** Apply soap and lather your hands well. Be sure to get the backs of your hands, between your fingers, and under your nails.
+3.  **Scrub:** Scrub your hands for at least **20 seconds**. (A good timer is humming the "Happy Birthday" song twice.)
+4.  **Rinse:** Rinse your hands well under clean, running water.
+5.  **Dry:** Dry your hands using a clean towel or air dryer.
+
+**Disclaimer:** This is general health advice. Handwashing is a key part of hygiene but does not replace other medical advice.
+        """),
+        Article(title="Understanding Mild Sprains", category="First Aid", content_md="""
+**What is a sprain?**
+A sprain is a stretching or tearing of ligaments — the tough bands of fibrous tissue that connect two bones in your joints. The most common location for a sprain is in your ankle.
+
+**Symptoms of a Mild Sprain**
+- Pain
+- Swelling
+- Bruising
+- Limited ability to move the joint
+
+**The R.I.C.E. Method**
+For the first 24-48 hours, the best treatment for a mild sprain is the R.I.C.E. approach:
+- **Rest:** Avoid activities that cause pain.
+- **Ice:** Apply an ice pack (wrapped in a thin towel) to the area for 15-20 minutes every 2-3 hours.
+- **Compression:** Use an elastic compression bandage to help reduce swelling.
+- **Elevation:** Elevate the injured joint above the level of your heart, especially at night.
+
+**Disclaimer:** Seek medical advice if you cannot put weight on the joint or if the pain and swelling are severe or do not improve after 2-3 days.
+        """),
+        Article(title="Tips for a Healthy Diet", category="Wellness", content_md="""
+**What is a healthy diet?**
+A healthy diet is one that helps to maintain or improve overall health. It provides the body with essential nutrition: fluid, macronutrients, micronutrients, and adequate calories.
+
+**Key Principles**
+1.  **Eat a Variety of Foods:** Include fruits, vegetables, whole grains, lean proteins, and healthy fats in your meals.
+2.  **Control Portion Sizes:** Avoid eating too much of any one food.
+3.  **Limit Processed Foods:** Reduce your intake of foods high in added sugar, salt (sodium), and unhealthy fats (trans and saturated fats).
+4.  **Stay Hydrated:** Drink plenty of water throughout the day.
+5.  **Listen to Your Body:** Eat when you're hungry and stop when you're full.
+
+**Disclaimer:** This is general dietary advice. For specific nutritional needs, allergies, or health conditions, please consult a registered dietitian or medical professional.
+        """),
+        Article(title="The Benefits of Regular Exercise", category="Wellness", content_md="""
+**Why exercise?**
+Regular physical activity is one of the most important things you can do for your health. It can help:
+- Control your weight
+- Reduce your risk of heart diseases
+- Improve your mental health and mood
+- Strengthen your bones and muscles
+- Improve your ability to do daily activities and prevent falls
+- Increase your chances of living longer
+
+**How much exercise?**
+Aim for at least 150 minutes of moderate-intensity aerobic activity (like brisk walking or swimming) or 75 minutes of vigorous-intensity activity (like running) each week, spread throughout the week. Also, include muscle-strengthening activities on 2 or more days a week.
+
+**Disclaimer:** Before starting any new exercise program, it's important to consult with your doctor, especially if you have any pre-existing health conditions.
+        """),
+        Article(title="Managing Stress", category="Wellness", content_md="""
+**What is stress?**
+Stress is your body's reaction to a challenge or demand. In short bursts, stress can be positive, such as when it helps you avoid danger. But when stress lasts for a long time, it may harm your health.
+
+**Techniques for Stress Management**
+- **Identify Stressors:** Figure out what is causing stress in your life.
+- **Physical Activity:** Exercise is a powerful stress reliever.
+- **Relaxation Techniques:** Try deep breathing, meditation, yoga, or mindfulness.
+- **Time Management:** Plan your day and prioritize tasks to avoid feeling overwhelmed.
+- **Social Support:** Talk to friends, family, or a mental health professional.
+- **Healthy Habits:** Eat a balanced diet, get enough sleep, and limit alcohol and caffeine.
+
+**Disclaimer:** If you are feeling overwhelmed by stress or it is impacting your daily life, please seek help from a qualified mental health professional.
+        """),
+        Article(title="Understanding Dehydration", category="Symptoms", content_md="""
+**What is dehydration?**
+Dehydration occurs when you lose more fluid than you take in, and your body doesn't have enough water and other fluids to carry out its normal functions.
+
+**Symptoms of Mild to Moderate Dehydration**
+- Thirst
+- Dry or sticky mouth
+- Not peeing very much
+- Dark yellow pee
+- Dry, cool skin
+- Headache
+- Muscle cramps
+
+**What to do**
+- **Drink Fluids:** The best treatment is to replace lost fluids by drinking water.
+- **Electrolytes:** For more significant fluid loss (e.g., from vomiting or diarrhea), an oral rehydration solution (like Pedialyte) or sports drinks can help replace lost electrolytes.
+
+**Disclaimer:** Seek immediate medical attention if you experience severe dehydration symptoms, such as dizziness, confusion, fainting, or inability to keep fluids down.
+        """),
+        Article(title="When to See a Doctor for a Cough", category="Symptoms", content_md="""
+**Most coughs are not serious.**
+A cough is a common reflex action that clears your throat of mucus or foreign irritants. Most coughs are caused by the common cold or flu and will go away on their own.
+
+**When to Consult a Doctor**
+You should see a medical professional if your cough:
+- Lasts for more than three weeks
+- Is very severe or getting worse
+- Is accompanied by a high fever, shortness of breath, or chest pain
+- Causes you to cough up blood or thick, discolored phlegm
+- Is accompanied by unexplained weight loss
+
+**Disclaimer:** This is not an exhaustive list. If you are ever concerned about a cough or any other symptom, it is always best to consult a medical professional for an accurate diagnosis and treatment.
+        """)
+    ]
+    db.session.bulk_save_objects(articles)

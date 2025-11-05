@@ -16,10 +16,17 @@ app = Flask(__name__)
 
 # --- Configurations ---
 app.config['SECRET_KEY'] = os.environ.get('FLASK_SECRET_KEY', 'a_very_strong_default_secret_key_12345')
-# Use Flask's instance path for the database
-instance_path = os.path.join(app.instance_path)
-os.makedirs(instance_path, exist_ok=True)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(instance_path, 'medconnect.db')
+
+# --- NEW: Permanent Database Configuration ---
+DATABASE_URL = os.environ.get('DATABASE_URL')
+if DATABASE_URL:
+    # We are on Render (production), use PostgreSQL
+    app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL
+else:
+    # We are running locally, use SQLite
+    instance_path = os.path.join(app.instance_path)
+    os.makedirs(instance_path, exist_ok=True)
+    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(instance_path, 'medconnect.db')
 
 # --- Extensions ---
 db = SQLAlchemy(app)
@@ -36,7 +43,7 @@ client = OpenAI(
     api_key=OPENROUTER_API_KEY,
 )
 
-# --- Database Models ---
+# --- Database Models (No Changes) ---
 
 class User(db.Model, UserMixin):
     id = db.Column(db.Integer, primary_key=True)
@@ -108,14 +115,18 @@ class Appointment(db.Model):
     doctor_id = db.Column(db.Integer, db.ForeignKey('doctor.id'), nullable=False)
 
 
-# --- Database Initialization Functions (RE-ORDERED FOR FIX) ---
+# --- Database Initialization Functions (MODIFIED) ---
 
-def _init_db():
-    """Internal function to create tables and add data. This is what we will call from our secret route."""
-    db.drop_all()
-    db.create_all()
+def _seed_data():
+    """Internal function to add sample data (articles and doctors)."""
+    # This function now *only* adds data, it does not drop tables.
     
-    # --- THIS IS THE FIX: Full Article Content Added ---
+    # Check if doctors exist, if so, don't add again
+    if Doctor.query.count() > 0:
+        print('Data already exists, skipping seeding.')
+        return False
+
+    # Add sample articles (Full text)
     articles = [
         Article(title="Understanding the Common Cold", category="Common Illness", content_md="""
 **What is a common cold?**
@@ -289,7 +300,7 @@ You should see a medical professional if your cough:
     ]
     db.session.bulk_save_objects(articles)
     
-    # --- Add ALL 9 Sample Doctors ---
+    # Add ALL 9 Sample Doctors (Full data)
     doctors = [
         Doctor(name="Jai Hind Clinic", specialty="Medical Clinic", 
                address="Nawabganj, durga mandir road, unnao Uttar Pradesh 209859", 
@@ -322,25 +333,35 @@ You should see a medical professional if your cough:
     db.session.bulk_save_objects(doctors)
     
     db.session.commit()
+    print('Seeded database with 10 articles and 9 doctors.')
+    return True
 
 @app.cli.command('init-db')
 def init_db_command():
     """Clears existing data and creates new tables, adding sample articles and doctors."""
     with app.app_context():
-        _init_db()
-        print('Initialized the database, added 10 sample articles, and 9 sample doctors.')
+        db.drop_all() 
+        db.create_all()
+        _seed_data()
+        print('Initialized local database.')
+
+
+# --- NEW: Automatic Database Creation ---
+# This block runs when the app starts.
+with app.app_context():
+    # 1. Create all tables if they don't exist
+    db.create_all()
+    # 2. Seed the database with articles/doctors if it's empty
+    _seed_data()
 
 # --- User Loader for Flask-Login ---
-
 @login_manager.user_loader
 def load_user(user_id):
     return User.query.get(int(user_id))
 
 # --- Main App Routes ---
-
 @app.route('/')
 def landing():
-    """Our new public-facing 3D landing page."""
     if current_user.is_authenticated:
         return redirect(url_for('dashboard'))
     form_to_show = request.args.get('form', None) 
@@ -349,37 +370,31 @@ def landing():
 @app.route('/dashboard')
 @login_required
 def dashboard():
-    """This is the new 'homepage' after logging in."""
-    return redirect(url_for('find_doctors')) # Go to the visual map page
+    return redirect(url_for('find_doctors')) 
 
 @app.route('/chat')
 @login_required
 def chat():
-    """The main chat interface."""
     return render_template('index.html', title='Chat - Medullose')
 
 @app.route('/signup', methods=['GET', 'POST'])
 def signup():
+    # ... (No changes to this function) ...
     if current_user.is_authenticated:
         return redirect(url_for('dashboard'))
-    
     if request.method == 'POST':
         name = request.form.get('name')
         email = request.form.get('email')
         password = request.form.get('password')
-        
         if not name or not email or not password:
             flash('All fields are required.', 'danger')
             return redirect(url_for('landing', form='signup'))
-        
         existing_user = User.query.filter_by(email=email).first()
         if existing_user:
             flash('That email is already taken. Please log in.', 'warning')
             return redirect(url_for('landing', form='login'))
-        
         hashed_password = bcrypt.generate_password_hash(password).decode('utf-8')
         new_user = User(name=name, email=email, password_hash=hashed_password)
-        
         try:
             db.session.add(new_user)
             db.session.commit()
@@ -394,20 +409,17 @@ def signup():
             app.logger.error(f"Error during signup: {e}")
             flash('A server error occurred. Please try again later.', 'danger')
             return redirect(url_for('landing', form='signup'))
-
     return redirect(url_for('landing', form='signup'))
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
+    # ... (No changes to this function) ...
     if current_user.is_authenticated:
         return redirect(url_for('dashboard'))
-    
     if request.method == 'POST':
         email = request.form.get('email')
         password = request.form.get('password')
-        
         user = User.query.filter_by(email=email).first()
-        
         if user and bcrypt.check_password_hash(user.password_hash, password):
             login_user(user, remember=True)
             next_page = request.args.get('next')
@@ -415,7 +427,6 @@ def login():
         else:
             flash('Login unsuccessful. Please check your email and password.', 'danger')
             return redirect(url_for('landing', form='login'))
-            
     return redirect(url_for('landing', form='login'))
 
 @app.route('/logout')
@@ -426,7 +437,6 @@ def logout():
     return redirect(url_for('landing')) 
 
 # --- Verified Health Library Routes ---
-
 @app.route('/library')
 @login_required
 def library():
@@ -440,13 +450,10 @@ def article_detail(article_id):
     if not article:
         flash('Article not found.', 'danger')
         return redirect(url_for('library'))
-    
     return render_template('article_detail.html', title=article.title, article=article)
 
 # --- Chat API Routes ---
-
 def get_openrouter_response(messages):
-    """Gets a response from the OpenRouter API."""
     try:
         completion = client.chat.completions.create(
             model="openai/gpt-oss-20b:free", 
@@ -505,19 +512,17 @@ def ask():
         data = json.loads(ai_response_content)
         
         if data.get('action') == 'create_reminder':
+            # ... (Reminder AI logic, no changes) ...
             med_name = data.get('medicine')
             dosage = data.get('dosage')
             time_str = data.get('time')
-
             if dosage == "None":
                 dosage = None 
-            
             if not med_name or not time_str:
                 ai_response_content = "I'm sorry, I missed some of those details. Could you please provide the medicine name and time again?"
             else:
                 try:
                     reminder_time_obj = time.fromisoformat(time_str)
-                    
                     new_reminder = Reminder(
                         medicine_name=med_name,
                         dosage=dosage,
@@ -525,11 +530,9 @@ def ask():
                         author=current_user
                     )
                     db.session.add(new_reminder)
-                    
                     time_friendly = reminder_time_obj.strftime('%I:%M %p') 
                     dosage_text = f" ({dosage})" if dosage else ""
                     ai_response_content = f"OK, I've set a reminder for {med_name}{dosage_text} at {time_friendly}. You can see all your reminders on the 'Reminders' page."
-
                 except ValueError:
                     ai_response_content = f"I'm sorry, I couldn't understand the time '{time_str}'. Please provide it in 24-hour HH:MM format (e.g., 08:00 for 8 AM or 20:00 for 8 PM)."
                 except Exception as e:
@@ -554,6 +557,7 @@ def ask():
 @app.route('/clear_chat', methods=['POST'])
 @login_required
 def clear_chat():
+    # ... (No changes to this function) ...
     try:
         ChatHistory.query.filter_by(user_id=current_user.id).delete()
         db.session.commit()
@@ -563,9 +567,7 @@ def clear_chat():
         app.logger.error(f"Error clearing chat history: {e}")
         return jsonify({"error": "Could not clear chat history"}), 500
 
-
 # --- Medicine Reminder Routes (API-driven) ---
-
 @app.route('/reminders')
 @login_required
 def reminders():
@@ -580,17 +582,15 @@ def get_reminders():
 @app.route('/api/add_reminder', methods=['POST'])
 @login_required
 def add_reminder():
+    # ... (No changes to this function) ...
     data = request.json
     try:
         med_name = data.get('medicine_name')
         dosage = data.get('dosage')
         time_str = data.get('reminder_time') 
-
         if not med_name or not time_str:
             return jsonify({"error": "Medicine name and time are required."}), 400
-        
         reminder_time_obj = time.fromisoformat(time_str)
-        
         new_reminder = Reminder(
             medicine_name=med_name,
             dosage=dosage,
@@ -599,9 +599,7 @@ def add_reminder():
         )
         db.session.add(new_reminder)
         db.session.commit()
-        
         return jsonify(new_reminder.to_dict()), 201
-        
     except ValueError:
         return jsonify({"error": "Invalid time format. Please use HH:MM (24-hour)."}), 400
     except Exception as e:
@@ -612,23 +610,20 @@ def add_reminder():
 @app.route('/api/delete_reminder/<int:reminder_id>', methods=['DELETE'])
 @login_required
 def delete_reminder(reminder_id):
+    # ... (No changes to this function) ...
     try:
         reminder = Reminder.query.get_or_404(reminder_id)
-        
         if reminder.user_id != current_user.id:
             return jsonify({"error": "Unauthorized"}), 403
-            
         db.session.delete(reminder)
         db.session.commit()
         return jsonify({"status": "success", "message": "Reminder deleted."})
-        
     except Exception as e:
         db.session.rollback()
         app.logger.error(f"Error deleting reminder: {e}")
         return jsonify({"error": "An internal error occurred."}), 500
 
 # --- Doctor & Appointment Routes ---
-
 @app.route('/find_doctors')
 @login_required
 def find_doctors():
@@ -643,51 +638,42 @@ def get_doctors():
 @app.route('/book/<int:doctor_id>', methods=['GET', 'POST'])
 @login_required
 def book_appointment(doctor_id):
+    # ... (No changes to this function) ...
     doctor = db.session.get(Doctor, doctor_id)
     if not doctor:
         flash('Doctor not found.', 'danger')
         return redirect(url_for('find_doctors'))
-    
     if request.method == 'POST':
         date_str = request.form.get('appointment_date')
         time_str = request.form.get('appointment_time')
         reason = request.form.get('reason')
-        
         if not date_str or not time_str:
             flash('Please select a valid date and time.', 'danger')
             return redirect(url_for('book_appointment', doctor_id=doctor_id))
-
         try:
             appointment_dt_str = f"{date_str} {time_str}"
             appointment_datetime = datetime.strptime(appointment_dt_str, '%Y-%m-%d %H:%M')
-
             if appointment_datetime < datetime.now():
                 flash('You cannot book an appointment in the past.', 'danger')
                 return redirect(url_for('book_appointment', doctor_id=doctor_id))
-
             new_appointment = Appointment(
                 appointment_datetime=appointment_datetime,
                 reason=reason,
                 patient=current_user,
                 doctor=doctor
             )
-            
             db.session.add(new_appointment)
             db.session.commit()
-            
             flash('Your appointment has been successfully booked!', 'success')
             return redirect(url_for('my_appointments'))
-
         except ValueError:
             flash('Invalid date or time format.', 'danger')
         except Exception as e:
             db.session.rollback()
             app.logger.error(f"Error booking appointment: {e}")
             flash('An error occurred while booking. Please try again.', 'danger')
-
     min_date = date.today().isoformat()
     return render_template('book_appointment.html', title=f"Book with {doctor.name}", doctor=doctor, min_date=min_date)
-
 
 @app.route('/my_appointments')
 @login_required
@@ -698,43 +684,23 @@ def my_appointments():
 @app.route('/cancel_appointment/<int:appointment_id>', methods=['POST'])
 @login_required
 def cancel_appointment(appointment_id):
+    # ... (No changes to this function) ...
     try:
         appointment = Appointment.query.get_or_404(appointment_id)
-        
         if appointment.user_id != current_user.id:
             flash('You are not authorized to cancel this appointment.', 'danger')
             return redirect(url_for('my_appointments'))
-        
         if appointment.appointment_datetime < datetime.now():
             flash('You cannot cancel an appointment that has already passed.', 'warning')
             return redirect(url_for('my_appointments'))
-            
         db.session.delete(appointment)
         db.session.commit()
         flash('Your appointment has been cancelled.', 'success')
-        
     except Exception as e:
         db.session.rollback()
         app.logger.error(f"Error cancelling appointment: {e}")
         flash('An error occurred while cancelling the appointment.', 'danger')
-        
     return redirect(url_for('my_appointments'))
-
-# --- NEW: Secret route to initialize the database on Render ---
-@app.route('/admin/super-secret-init-db')
-def secret_init_db():
-    # This is a simple security measure. 
-    # For a real app, you'd want a better password system.
-    secret_key = request.args.get('key')
-    if secret_key == 'medullose-admin-12345': # Key updated to 'medullose'
-        try:
-            with app.app_context():
-                _init_db()
-            return "DATABASE INITIALIZED SUCCESSFULLY."
-        except Exception as e:
-            return f"An error occurred: {e}"
-    else:
-        return "Not authorized.", 403
 
 # --- Main Run ---
 if __name__ == '__main__':
