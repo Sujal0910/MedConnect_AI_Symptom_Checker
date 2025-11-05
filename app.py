@@ -16,17 +16,10 @@ app = Flask(__name__)
 
 # --- Configurations ---
 app.config['SECRET_KEY'] = os.environ.get('FLASK_SECRET_KEY', 'a_very_strong_default_secret_key_12345')
-
-# --- NEW: Permanent Database Configuration ---
-DATABASE_URL = os.environ.get('DATABASE_URL')
-if DATABASE_URL:
-    # We are on Render (production), use PostgreSQL
-    app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL
-else:
-    # We are running locally, use SQLite
-    instance_path = os.path.join(app.instance_path)
-    os.makedirs(instance_path, exist_ok=True)
-    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(instance_path, 'medconnect.db')
+# Use Flask's instance path for the database
+instance_path = os.path.join(app.instance_path)
+os.makedirs(instance_path, exist_ok=True)
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL') or 'sqlite:///' + os.path.join(instance_path, 'medconnect.db')
 
 # --- Extensions ---
 db = SQLAlchemy(app)
@@ -43,7 +36,7 @@ client = OpenAI(
     api_key=OPENROUTER_API_KEY,
 )
 
-# --- Database Models (No Changes) ---
+# --- Database Models ---
 
 class User(db.Model, UserMixin):
     id = db.Column(db.Integer, primary_key=True)
@@ -115,18 +108,16 @@ class Appointment(db.Model):
     doctor_id = db.Column(db.Integer, db.ForeignKey('doctor.id'), nullable=False)
 
 
-# --- Database Initialization Functions (MODIFIED) ---
+# --- Database Initialization Functions ---
 
 def _seed_data():
     """Internal function to add sample data (articles and doctors)."""
-    # This function now *only* adds data, it does not drop tables.
-    
     # Check if doctors exist, if so, don't add again
     if Doctor.query.count() > 0:
         print('Data already exists, skipping seeding.')
         return False
 
-    # Add sample articles (Full text)
+    # --- Full Article Content Added ---
     articles = [
         Article(title="Understanding the Common Cold", category="Common Illness", content_md="""
 **What is a common cold?**
@@ -300,7 +291,7 @@ You should see a medical professional if your cough:
     ]
     db.session.bulk_save_objects(articles)
     
-    # Add ALL 9 Sample Doctors (Full data)
+    # --- Add ALL 9 Sample Doctors ---
     doctors = [
         Doctor(name="Jai Hind Clinic", specialty="Medical Clinic", 
                address="Nawabganj, durga mandir road, unnao Uttar Pradesh 209859", 
@@ -333,8 +324,7 @@ You should see a medical professional if your cough:
     db.session.bulk_save_objects(doctors)
     
     db.session.commit()
-    print('Seeded database with 10 articles and 9 doctors.')
-    return True
+    return True # Return success
 
 @app.cli.command('init-db')
 def init_db_command():
@@ -345,14 +335,6 @@ def init_db_command():
         _seed_data()
         print('Initialized local database.')
 
-
-# --- NEW: Automatic Database Creation ---
-# This block runs when the app starts.
-with app.app_context():
-    # 1. Create all tables if they don't exist
-    db.create_all()
-    # 2. Seed the database with articles/doctors if it's empty
-    _seed_data()
 
 # --- User Loader for Flask-Login ---
 @login_manager.user_loader
@@ -379,22 +361,26 @@ def chat():
 
 @app.route('/signup', methods=['GET', 'POST'])
 def signup():
-    # ... (No changes to this function) ...
     if current_user.is_authenticated:
         return redirect(url_for('dashboard'))
+    
     if request.method == 'POST':
         name = request.form.get('name')
         email = request.form.get('email')
         password = request.form.get('password')
+        
         if not name or not email or not password:
             flash('All fields are required.', 'danger')
             return redirect(url_for('landing', form='signup'))
+        
         existing_user = User.query.filter_by(email=email).first()
         if existing_user:
             flash('That email is already taken. Please log in.', 'warning')
             return redirect(url_for('landing', form='login'))
+        
         hashed_password = bcrypt.generate_password_hash(password).decode('utf-8')
         new_user = User(name=name, email=email, password_hash=hashed_password)
+        
         try:
             db.session.add(new_user)
             db.session.commit()
@@ -409,17 +395,20 @@ def signup():
             app.logger.error(f"Error during signup: {e}")
             flash('A server error occurred. Please try again later.', 'danger')
             return redirect(url_for('landing', form='signup'))
+
     return redirect(url_for('landing', form='signup'))
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
-    # ... (No changes to this function) ...
     if current_user.is_authenticated:
         return redirect(url_for('dashboard'))
+    
     if request.method == 'POST':
         email = request.form.get('email')
         password = request.form.get('password')
+        
         user = User.query.filter_by(email=email).first()
+        
         if user and bcrypt.check_password_hash(user.password_hash, password):
             login_user(user, remember=True)
             next_page = request.args.get('next')
@@ -427,6 +416,7 @@ def login():
         else:
             flash('Login unsuccessful. Please check your email and password.', 'danger')
             return redirect(url_for('landing', form='login'))
+            
     return redirect(url_for('landing', form='login'))
 
 @app.route('/logout')
@@ -512,7 +502,7 @@ def ask():
         data = json.loads(ai_response_content)
         
         if data.get('action') == 'create_reminder':
-            # ... (Reminder AI logic, no changes) ...
+            # ... (Reminder AI logic) ...
             med_name = data.get('medicine')
             dosage = data.get('dosage')
             time_str = data.get('time')
@@ -557,7 +547,6 @@ def ask():
 @app.route('/clear_chat', methods=['POST'])
 @login_required
 def clear_chat():
-    # ... (No changes to this function) ...
     try:
         ChatHistory.query.filter_by(user_id=current_user.id).delete()
         db.session.commit()
@@ -582,7 +571,6 @@ def get_reminders():
 @app.route('/api/add_reminder', methods=['POST'])
 @login_required
 def add_reminder():
-    # ... (No changes to this function) ...
     data = request.json
     try:
         med_name = data.get('medicine_name')
@@ -610,7 +598,6 @@ def add_reminder():
 @app.route('/api/delete_reminder/<int:reminder_id>', methods=['DELETE'])
 @login_required
 def delete_reminder(reminder_id):
-    # ... (No changes to this function) ...
     try:
         reminder = Reminder.query.get_or_404(reminder_id)
         if reminder.user_id != current_user.id:
@@ -638,40 +625,48 @@ def get_doctors():
 @app.route('/book/<int:doctor_id>', methods=['GET', 'POST'])
 @login_required
 def book_appointment(doctor_id):
-    # ... (No changes to this function) ...
     doctor = db.session.get(Doctor, doctor_id)
     if not doctor:
         flash('Doctor not found.', 'danger')
         return redirect(url_for('find_doctors'))
+    
     if request.method == 'POST':
         date_str = request.form.get('appointment_date')
         time_str = request.form.get('appointment_time')
         reason = request.form.get('reason')
+        
         if not date_str or not time_str:
             flash('Please select a valid date and time.', 'danger')
             return redirect(url_for('book_appointment', doctor_id=doctor_id))
+
         try:
             appointment_dt_str = f"{date_str} {time_str}"
             appointment_datetime = datetime.strptime(appointment_dt_str, '%Y-%m-%d %H:%M')
+
             if appointment_datetime < datetime.now():
                 flash('You cannot book an appointment in the past.', 'danger')
                 return redirect(url_for('book_appointment', doctor_id=doctor_id))
+
             new_appointment = Appointment(
                 appointment_datetime=appointment_datetime,
                 reason=reason,
                 patient=current_user,
                 doctor=doctor
             )
+            
             db.session.add(new_appointment)
             db.session.commit()
+            
             flash('Your appointment has been successfully booked!', 'success')
             return redirect(url_for('my_appointments'))
+
         except ValueError:
             flash('Invalid date or time format.', 'danger')
         except Exception as e:
             db.session.rollback()
             app.logger.error(f"Error booking appointment: {e}")
             flash('An error occurred while booking. Please try again.', 'danger')
+
     min_date = date.today().isoformat()
     return render_template('book_appointment.html', title=f"Book with {doctor.name}", doctor=doctor, min_date=min_date)
 
@@ -684,23 +679,42 @@ def my_appointments():
 @app.route('/cancel_appointment/<int:appointment_id>', methods=['POST'])
 @login_required
 def cancel_appointment(appointment_id):
-    # ... (No changes to this function) ...
     try:
         appointment = Appointment.query.get_or_404(appointment_id)
+        
         if appointment.user_id != current_user.id:
             flash('You are not authorized to cancel this appointment.', 'danger')
             return redirect(url_for('my_appointments'))
+        
         if appointment.appointment_datetime < datetime.now():
             flash('You cannot cancel an appointment that has already passed.', 'warning')
             return redirect(url_for('my_appointments'))
+            
         db.session.delete(appointment)
         db.session.commit()
         flash('Your appointment has been cancelled.', 'success')
+        
     except Exception as e:
         db.session.rollback()
         app.logger.error(f"Error cancelling appointment: {e}")
         flash('An error occurred while cancelling the appointment.', 'danger')
+        
     return redirect(url_for('my_appointments'))
+
+# --- NEW: Secret route to initialize the database on Render ---
+@app.route('/admin/super-secret-init-db')
+def secret_init_db():
+    # This is a simple security measure. 
+    secret_key = request.args.get('key')
+    if secret_key == 'medullose-admin-12345': # Key updated to 'medullose'
+        try:
+            with app.app_context():
+                _seed_data() # This will only seed if data is missing
+            return "DATABASE SEEDED SUCCESSFULLY."
+        except Exception as e:
+            return f"An error occurred: {e}"
+    else:
+        return "Not authorized.", 403
 
 # --- Main Run ---
 if __name__ == '__main__':
