@@ -324,7 +324,7 @@ You should see a medical professional if your cough:
     db.session.bulk_save_objects(doctors)
     
     db.session.commit()
-    return True # Return success
+    return True
 
 @app.cli.command('init-db')
 def init_db_command():
@@ -352,11 +352,14 @@ def landing():
 @app.route('/dashboard')
 @login_required
 def dashboard():
-    return redirect(url_for('find_doctors')) 
+    """This is the new 'homepage' after logging in."""
+    # --- THIS IS THE FIX ---
+    return redirect(url_for('chat')) # Go to the chat page
 
 @app.route('/chat')
 @login_required
 def chat():
+    """The main chat interface."""
     return render_template('index.html', title='Chat - Medullose')
 
 @app.route('/signup', methods=['GET', 'POST'])
@@ -502,17 +505,19 @@ def ask():
         data = json.loads(ai_response_content)
         
         if data.get('action') == 'create_reminder':
-            # ... (Reminder AI logic) ...
             med_name = data.get('medicine')
             dosage = data.get('dosage')
             time_str = data.get('time')
+
             if dosage == "None":
                 dosage = None 
+            
             if not med_name or not time_str:
                 ai_response_content = "I'm sorry, I missed some of those details. Could you please provide the medicine name and time again?"
             else:
                 try:
                     reminder_time_obj = time.fromisoformat(time_str)
+                    
                     new_reminder = Reminder(
                         medicine_name=med_name,
                         dosage=dosage,
@@ -520,9 +525,11 @@ def ask():
                         author=current_user
                     )
                     db.session.add(new_reminder)
+                    
                     time_friendly = reminder_time_obj.strftime('%I:%M %p') 
                     dosage_text = f" ({dosage})" if dosage else ""
                     ai_response_content = f"OK, I've set a reminder for {med_name}{dosage_text} at {time_friendly}. You can see all your reminders on the 'Reminders' page."
+
                 except ValueError:
                     ai_response_content = f"I'm sorry, I couldn't understand the time '{time_str}'. Please provide it in 24-hour HH:MM format (e.g., 08:00 for 8 AM or 20:00 for 8 PM)."
                 except Exception as e:
@@ -576,9 +583,12 @@ def add_reminder():
         med_name = data.get('medicine_name')
         dosage = data.get('dosage')
         time_str = data.get('reminder_time') 
+
         if not med_name or not time_str:
             return jsonify({"error": "Medicine name and time are required."}), 400
+        
         reminder_time_obj = time.fromisoformat(time_str)
+        
         new_reminder = Reminder(
             medicine_name=med_name,
             dosage=dosage,
@@ -587,7 +597,9 @@ def add_reminder():
         )
         db.session.add(new_reminder)
         db.session.commit()
+        
         return jsonify(new_reminder.to_dict()), 201
+        
     except ValueError:
         return jsonify({"error": "Invalid time format. Please use HH:MM (24-hour)."}), 400
     except Exception as e:
@@ -600,11 +612,14 @@ def add_reminder():
 def delete_reminder(reminder_id):
     try:
         reminder = Reminder.query.get_or_404(reminder_id)
+        
         if reminder.user_id != current_user.id:
             return jsonify({"error": "Unauthorized"}), 403
+            
         db.session.delete(reminder)
         db.session.commit()
         return jsonify({"status": "success", "message": "Reminder deleted."})
+        
     except Exception as e:
         db.session.rollback()
         app.logger.error(f"Error deleting reminder: {e}")
@@ -670,6 +685,7 @@ def book_appointment(doctor_id):
     min_date = date.today().isoformat()
     return render_template('book_appointment.html', title=f"Book with {doctor.name}", doctor=doctor, min_date=min_date)
 
+
 @app.route('/my_appointments')
 @login_required
 def my_appointments():
@@ -709,8 +725,9 @@ def secret_init_db():
     if secret_key == 'medullose-admin-12345': # Key updated to 'medullose'
         try:
             with app.app_context():
-                _seed_data() # This will only seed if data is missing
-            return "DATABASE SEEDED SUCCESSFULLY."
+                db.create_all() # First, ensure all tables exist
+                _seed_data() # Then, seed the data (it has a check)
+            return "DATABASE INITIALIZED/SEEDED SUCCESSFULLY."
         except Exception as e:
             return f"An error occurred: {e}"
     else:
